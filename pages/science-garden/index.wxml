@@ -1,0 +1,72 @@
+<!--科普园地页面-->
+<view class="science-garden-container">
+  <!-- 状态栏占位 -->
+  <view class="status-bar" style="height: {{navTop}}px;"></view>
+  
+  <!-- 自定义导航栏 -->
+  <view class="custom-navbar">
+    <view class="navbar-content">
+      <view class="navbar-left">
+        <view class="back-btn" bindtap="goBack">
+          <van-icon name="arrow-left" size="20" color="#fff" />
+        </view>
+        <view class="home-btn" bindtap="goHome">
+          <van-icon name="home-o" size="20" color="#fff" />
+        </view>
+      </view>
+      <view class="navbar-title" bindlongpress="clearCacheAndReload">科普园地</view>
+      <view class="navbar-right"></view>
+    </view>
+  </view>
+
+  <!-- 搜索框 -->
+  <view class="search-container">
+    <van-search 
+      value="{{searchKeyword}}" 
+      placeholder="搜索科普文章" 
+      bind:change="onSearchChange"
+      bind:search="onSearch"
+      show-action
+    />
+  </view>
+
+  <!-- 文章列表 -->
+  <view class="list">
+    <view class="article-item" wx:for="{{articles}}" wx:key="id" data-article="{{item}}" bindtap="onArticleTap">
+      <!-- 文章封面图片 -->
+      <view class="article-cover" wx:if="{{item.pic}}">
+        <image src="{{item.pic}}" mode="aspectFill" class="cover-image" />
+      </view>
+      
+      <!-- 文章内容 -->
+      <view class="article-content">
+        <view class="article-title">{{item.title}}</view>
+        <view class="article-summary" wx:if="{{item.summary}}">{{item.summary}}</view>
+        
+        <!-- 文章元信息 -->
+        <view class="article-meta">
+          <view class="meta-left">
+            <view class="author-info" wx:if="{{item.author}}">
+              <text class="author-icon">👤</text>
+              <text class="author-name">{{item.author}}</text>
+            </view>
+            <view class="publish-time">{{item.dateAdd || item.createTime}}</view>
+          </view>
+          <view class="meta-right">
+            <view class="read-count">
+              <text class="read-icon">👁</text>
+              <text>{{item.displayVv || 0}}</text>
+            </view>
+            <view class="comment-count" wx:if="{{item.commentCount}}">
+              <text class="comment-icon">💬</text>
+              <text>{{item.commentCount}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+    
+    <view class="loading" wx:if="{{loading}}">加载中...</view>
+    <view class="no-more" wx:if="{{!hasMore && articles.length>0}}">没有更多了</view>
+  </view>
+</view>

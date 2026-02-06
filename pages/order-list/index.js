@@ -1,10 +1,9 @@
-const wxpay = require('../../utils/pay.js')
-const app = getApp()
 const WXAPI = require('apifm-wxapi')
-const AUTH = require('../../utils/auth')
 
 Page({
   data: {
+    page: 1,
+    tabIndex: 0,
     statusType: [
       {
         status: 9999,
@@ -32,11 +31,13 @@ Page({
     badges: [0, 0, 0, 0, 0]
   },
   statusTap: function(e) {
-    const status = e.currentTarget.dataset.status;
+    const index = e.detail.index
+    const status = this.data.statusType[index].status
     this.setData({
+      page: 1,
       status
     });
-    this.onShow();
+    this.orderList();
   },
   cancelOrderTap: function(e) {
     const that = this;
@@ -48,19 +49,21 @@ Page({
         if (res.confirm) {
           WXAPI.orderClose(wx.getStorageSync('token'), orderId).then(function(res) {
             if (res.code == 0) {
-              that.onShow();
+              that.data.page = 1
+              that.orderList()
+              that.getOrderStatistics()
             }
           })
         }
       }
     })
   },
-  refundApply (e) {
-    // 申请售后
+  async refundApply (e) {
+    // 申请售后 todo 判断是去申请页面还是去查看页面
     const orderId = e.currentTarget.dataset.id;
     const amount = e.currentTarget.dataset.amount;
     wx.navigateTo({
-      url: "/pages/order/refundApply?id=" + orderId + "&amount=" + amount
+      url: "/pages/order/refundApply?id=" + orderId
     })
   },
   toPayTap: function(e) {
@@ -83,6 +86,10 @@ Page({
     const needScore = e.currentTarget.dataset.score;
     WXAPI.userAmount(wx.getStorageSync('token')).then(function(res) {
       if (res.code == 0) {
+        const order_pay_user_balance = wx.getStorageSync('order_pay_user_balance')
+        if (order_pay_user_balance != '1') {
+          res.data.balance = 0
+        }
         // 增加提示框
         if (res.data.score < needScore) {
           wx.showToast({
@@ -95,7 +102,7 @@ Page({
         if (res.data.balance > 0) {
           _msg += ',可用余额为 ' + res.data.balance +' 元'
           if (money - res.data.balance > 0) {
-            _msg += ',仍需微信支付 ' + (money - res.data.balance) + ' 元'
+            _msg += ',仍需微信支付 ' + (money - res.data.balance).toFixed(2) + ' 元'
           }          
         }
         if (needScore > 0) {
@@ -125,15 +132,57 @@ Page({
       }
     })
   },
+  async wxSphGetpaymentparams(e) {
+    const orderId = e.currentTarget.dataset.id
+    const res = await WXAPI.wxSphGetpaymentparams(wx.getStorageSync('token'), orderId)
+    if (res.code != 0) {
+      wx.showToast({
+        title: res.msg,
+        icon: 'none'
+      })
+      return;
+    }
+    // 发起支付
+    wx.requestPayment({
+      timeStamp: res.data.timeStamp,
+      nonceStr: res.data.nonceStr,
+      package: res.data.package,
+      signType: res.data.signType,
+      paySign: res.data.paySign,
+      fail: aaa => {
+        console.error(aaa)
+        wx.showToast({
+          title: '支付失败:' + aaa
+        })
+      },
+      success: () => {
+        // 提示支付成功
+        wx.showToast({
+          title: '支付成功'
+        })
+        this.orderList()
+      }
+    })
+  },
   _toPayTap: function (orderId, money){
     const _this = this
     if (money <= 0) {
       // 直接使用余额支付
       WXAPI.orderPay(wx.getStorageSync('token'), orderId).then(function (res) {
-        _this.onShow();
+        _this.data.page = 1
+        _this.orderList()
+        _this.getOrderStatistics()
       })
     } else {
-      wxpay.wxpay('order', money, orderId, "/pages/order-list/index");
+      this.setData({
+        orderId,
+        money,
+        paymentShow: true,
+        nextAction: {
+          type: 0,
+          id: orderId
+        }
+      })
     }
   },
   onLoad: function(options) {
@@ -143,11 +192,20 @@ Page({
           hasRefund: true
         });
       } else {
+        const tabIndex = this.data.statusType.findIndex(ele => {
+          return ele.status == options.type
+        })
         this.setData({
-          status: options.type
+          status: options.type,
+          tabIndex
         });
       }      
     }
+    this.getOrderStatistics();
+    this.orderList();
+    this.setData({
+      sphpay_open: wx.getStorageSync('sphpay_open')
+    })
   },
   onReady: function() {
     // 生命周期函数--监听页面初次渲染完成
@@ -168,74 +226,80 @@ Page({
     })
   },
   onShow: function() {
-    AUTH.checkHasLogined().then(isLogined => {
-      if (isLogined) {
-        this.doneShow();
-      } else {
-        wx.showModal({
-          title: '提示',
-          content: '本次操作需要您的登录授权',
-          cancelText: '暂不登录',
-          confirmText: '前往登录',
-          success(res) {
-            if (res.confirm) {
-              wx.switchTab({
-                url: "/pages/my/index"
-              })
-            } else {
-              wx.navigateBack()
-            }
-          }
-        })
-      }
-    })
   },
-  doneShow() {
-    // 获取订单列表
-    var that = this;
+  onPullDownRefresh: function () {
+    this.data.page = 1
+    this.getOrderStatistics()
+    this.orderList()
+    wx.stopPullDownRefresh()
+  },
+  onReachBottom() {
+    this.setData({
+      page: this.data.page + 1
+    });
+    this.orderList()
+  },
+  async orderList(){
+    wx.showLoading({
+      title: '',
+    })
     var postData = {
+      page: this.data.page,
+      pageSize: 20,
       token: wx.getStorageSync('token')
     };
     if (this.data.hasRefund) {
       postData.hasRefund = true
     }
     if (!postData.hasRefund) {
-      postData.status = that.data.status;
+      postData.status = this.data.status;
     }
     if (postData.status == 9999) {
       postData.status = ''
     }
-    this.getOrderStatistics();
-    WXAPI.orderList(postData).then(function(res) {
-      if (res.code == 0) {
-        that.setData({
+    const res = await WXAPI.orderList(postData)
+    wx.hideLoading()
+    if (res.code == 0) {
+      if (this.data.page == 1) {
+        this.setData({
           orderList: res.data.orderList,
           logisticsMap: res.data.logisticsMap,
           goodsMap: res.data.goodsMap
-        });
+        })
       } else {
-        that.setData({
+        this.setData({
+          orderList: this.data.orderList.concat(res.data.orderList),
+          logisticsMap: Object.assign(this.data.logisticsMap, res.data.logisticsMap),
+          goodsMap: Object.assign(this.data.goodsMap, res.data.goodsMap)
+        })
+      }
+    } else {
+      if (this.data.page == 1) {
+        this.setData({
           orderList: null,
           logisticsMap: {},
           goodsMap: {}
-        });
+        })
+      } else {
+        wx.showToast({
+          title: '没有更多了',
+          icon: 'none'
+        })
       }
+    }
+  },
+  paymentOk(e) {
+    console.log(e.detail); // 这里是组件里data的数据
+    this.setData({
+      paymentShow: false
+    })
+    wx.redirectTo({
+      url: '/pages/order-list/index',
     })
   },
-  onHide: function() {
-    // 生命周期函数--监听页面隐藏
-
+  paymentCancel() {
+    this.setData({
+      paymentShow: false
+    })
   },
-  onUnload: function() {
-    // 生命周期函数--监听页面卸载
-
-  },
-  onPullDownRefresh: function() {
-    // 页面相关事件处理函数--监听用户下拉动作
-
-  },
-  onReachBottom: function() {
-    // 页面上拉触底事件的处理函数
-
-  }
 })

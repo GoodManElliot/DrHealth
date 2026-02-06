@@ -27,13 +27,13 @@ Page({
     wx.showLoading({
       title: '',
     })
-    const res = await WXAPI.cmsArticles({
+    const res = await WXAPI.cmsArticlesV3({
       categoryId
     })
     wx.hideLoading()
     if (res.code == 0) {
       this.setData({
-        cmsArticles: res.data
+        cmsArticles: res.data.result
       })
     } else {
       this.setData({
@@ -45,5 +45,21 @@ Page({
     const index = e.detail
     const category = this.data.category[index]
     this.articles(category.id)
+  },
+  onShareAppMessage: function() {
+    const uid = wx.getStorageSync('uid')
+    return {
+      title: wx.getStorageSync('mallName') + ' - 帮助中心',
+      path: `/pages/help/index?inviter_id=${ uid ? uid : ''}`,
+      imageUrl: wx.getStorageSync('share_pic')
+    }
+  },
+  onShareTimeline() {
+    const uid = wx.getStorageSync('uid')   
+    return {
+      title: wx.getStorageSync('mallName') + ' - 帮助中心',
+      query: `inviter_id=${ uid ? uid : ''}`,
+      imageUrl: wx.getStorageSync('share_pic')
+    }
   },
 })

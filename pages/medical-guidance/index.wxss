@@ -1,0 +1,190 @@
+/* 医学指导页面样式 */
+.medical-guidance-container {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+/* 自定义导航栏 */
+.custom-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: #fff;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.navbar-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 88rpx;
+  padding: 0 30rpx;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.back-btn, .home-btn {
+  padding: 10rpx;
+  margin-right: 20rpx;
+}
+
+.navbar-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+}
+
+/* 页面内容 */
+.page-content {
+  margin-top: calc(var(--navHeight, 88rpx) + 20rpx);
+  padding: 0 30rpx;
+}
+
+/* 页面标题 */
+.page-header {
+  text-align: center;
+  padding: 40rpx 0;
+}
+
+.page-title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 16rpx;
+}
+
+.page-subtitle {
+  font-size: 28rpx;
+  color: #666;
+  line-height: 1.5;
+}
+
+/* 指导项目列表 */
+.guidance-list {
+  margin-bottom: 40rpx;
+}
+
+.guidance-item {
+  margin-bottom: 24rpx;
+}
+
+.guidance-card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.08);
+  border-left: 6rpx solid #4ECDC4;
+  transition: transform 0.3s ease;
+}
+
+.guidance-card:active {
+  transform: scale(0.98);
+}
+
+.guidance-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.guidance-icon {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 24rpx;
+}
+
+.icon-text {
+  font-size: 36rpx;
+}
+
+.guidance-info {
+  flex: 1;
+}
+
+.guidance-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8rpx;
+}
+
+.guidance-desc {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.guidance-arrow {
+  padding: 10rpx;
+}
+
+.guidance-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.item-tag {
+  background: #f8f9fa;
+  color: #666;
+  font-size: 22rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid #e9ecef;
+}
+
+/* 重要提醒 */
+.warning-section {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  margin-bottom: 40rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.08);
+  border-left: 6rpx solid #FF6B6B;
+}
+
+.warning-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.warning-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+  margin-left: 12rpx;
+}
+
+.warning-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.warning-text {
+  font-size: 24rpx;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 12rpx;
+}
+
+.warning-text:last-child {
+  margin-bottom: 0;
+}
+
+

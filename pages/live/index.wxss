@@ -182,9 +182,6 @@
   color:#e64340;
   border-bottom: 1rpx solid #e64340;
 }
-.weui-loadmore {
-  margin-bottom: 0px;
-}
 .goods-container{
   display: flex;
   justify-content: space-between;  
@@ -338,10 +335,6 @@
   font-size: 24rpx;
   margin-right: 32rpx;
 }
-
-.weui-media-box {
-  padding-bottom: 0rpx;
-}
 .progress {
   width: 686rpx;
   padding: 0 32rpx;
@@ -393,9 +386,6 @@
   text-align: center;
 }
 .miaosha-price-btn {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   padding-top: 32rpx;
 }
 .miaosha-price-btn .price {

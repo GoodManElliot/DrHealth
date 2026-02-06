@@ -1,0 +1,76 @@
+<!--生活指导页面-->
+<view class="life-guidance-container">
+  <!-- 自定义导航栏 -->
+  <view class="custom-navbar" style="height: {{navHeight}}px; padding-top: {{navTop}}px;">
+    <view class="navbar-content">
+      <view class="navbar-left">
+        <view class="back-btn" bindtap="goBack">
+          <van-icon name="arrow-left" size="20" color="#333" />
+        </view>
+        <view class="home-btn" bindtap="goHome">
+          <van-icon name="home-o" size="20" color="#333" />
+        </view>
+      </view>
+      <view class="navbar-title">生活指导</view>
+      <view class="navbar-right">
+        <van-icon name="ellipsis" size="20" color="#333" />
+      </view>
+    </view>
+  </view>
+
+  <!-- 页面内容 -->
+  <view class="page-content">
+    <!-- 页面标题 -->
+    <view class="page-header">
+      <text class="page-title">高尿酸生活指导</text>
+      <text class="page-subtitle">科学的生活方式，助您远离高尿酸困扰</text>
+    </view>
+
+    <!-- 指导项目列表 -->
+    <view class="guidance-list">
+      <view class="guidance-item" 
+            wx:for="{{guidanceList}}" 
+            wx:key="id"
+            data-guidance="{{item}}"
+            bindtap="onGuidanceTap">
+        <view class="guidance-card" style="border-left-color: {{item.color}};">
+          <view class="guidance-header">
+            <view class="guidance-icon" style="background: {{item.color}};">
+              <text class="icon-text">{{item.icon}}</text>
+            </view>
+            <view class="guidance-info">
+              <text class="guidance-title">{{item.title}}</text>
+              <text class="guidance-desc">点击查看详细指导</text>
+            </view>
+            <view class="guidance-arrow">
+              <van-icon name="arrow" size="16" color="#999" />
+            </view>
+          </view>
+          
+          <view class="guidance-items">
+            <view class="item-tag" 
+                  wx:for="{{item.items}}" 
+                  wx:key="*this"
+                  wx:for-item="subItem">
+              {{subItem}}
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 温馨提示 -->
+    <view class="tips-section">
+      <view class="tips-header">
+        <van-icon name="info-o" size="20" color="#FF6B6B" />
+        <text class="tips-title">温馨提示</text>
+      </view>
+      <view class="tips-content">
+        <text class="tips-text">• 生活指导仅供参考，具体请咨询专业医生</text>
+        <text class="tips-text">• 如有不适症状，请及时就医</text>
+        <text class="tips-text">• 坚持科学的生活方式，定期复查</text>
+      </view>
+    </view>
+  </view>
+</view>
+

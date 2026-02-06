@@ -1,5 +1,5 @@
 const WXAPI = require('apifm-wxapi')
-const AUTH = require('../../utils/auth')
+const TOOLS = require('../../utils/tools.js') // TOOLS.showTabBarBadge();
 Page({
 
   /**
@@ -9,6 +9,7 @@ Page({
     listType: 1, // 1为1个商品一行，2为2个商品一行    
     name: '', // 搜索关键词
     orderBy: '', // 排序规则
+    page: 1 // 读取第几页
   },
 
   /**
@@ -20,30 +21,35 @@ Page({
       categoryId: options.categoryId
     })
     this.search()
+    this.readConfigVal()
+    // 补偿写法
+    getApp().configLoadOK = () => {
+      this.readConfigVal()
+    }
   },
-
-  /**
-   * 生命周期函数--监听页面初次渲染完成
-   */
-  onReady: function () {
-
-  },
-
-  /**
-   * 生命周期函数--监听页面显示
-   */
   onShow: function () {
 
   },
+  readConfigVal() {
+    const show_seller_number = wx.getStorageSync('show_seller_number')
+    const goods_search_show_type = wx.getStorageSync('goods_search_show_type')
+    let listType = 1
+    if (goods_search_show_type == 2) {
+      listType = 2
+    }
+    this.setData({
+      show_seller_number,
+      listType
+    })
+  },
   async search(){
-    // 搜索商品
     wx.showLoading({
       title: '加载中',
     })
     const _data = {
       orderBy: this.data.orderBy,
-      page: 1,
-      pageSize: 500,
+      page: this.data.page,
+      pageSize: 20,
     }
     if (this.data.name) {
       _data.k = this.data.name
@@ -51,44 +57,36 @@ Page({
     if (this.data.categoryId) {
       _data.categoryId = this.data.categoryId
     }
-    const res = await WXAPI.goods(_data)
+    const res = await WXAPI.goodsv2(_data)
     wx.hideLoading()
     if (res.code == 0) {
-      this.setData({
-        goods: res.data,
-      })
+      if (this.data.page == 1) {
+        this.setData({
+          goods: res.data.result,
+        })
+      } else {
+        this.setData({
+          goods: this.data.goods.concat(res.data.result),
+        })
+      }
     } else {
-      this.setData({
-        goods: null,
-      })
+      if (this.data.page == 1) {
+        this.setData({
+          goods: null,
+        })
+      } else {
+        wx.showToast({
+          title: '没有更多了',
+          icon: 'none'
+        })
+      }
     }
   },
-  /**
-   * 生命周期函数--监听页面隐藏
-   */
-  onHide: function () {
-
-  },
-
-  /**
-   * 生命周期函数--监听页面卸载
-   */
-  onUnload: function () {
-
-  },
-
-  /**
-   * 页面相关事件处理函数--监听用户下拉动作
-   */
-  onPullDownRefresh: function () {
-
-  },
-
-  /**
-   * 页面上拉触底事件的处理函数
-   */
-  onReachBottom: function () {
-
+  onReachBottom() {
+    this.setData({
+      page: this.data.page + 1
+    });
+    this.search()
   },
   changeShowType(){
     if (this.data.listType == 1) {
@@ -108,12 +106,14 @@ Page({
   },
   bindconfirm(e){
     this.setData({
+      page: 1,
       name: e.detail.value
     })
     this.search()
   },
   filter(e){
     this.setData({
+      page: 1,
       orderBy: e.currentTarget.dataset.val
     })
     this.search()
@@ -132,124 +132,38 @@ Page({
       })
       return
     }
-    this.addShopCarCheck({
-      goodsId: curGood.id,
-      buyNumber: 1,
-      sku: []
-    })
-  },
-  async addShopCarCheck(options) {
-    AUTH.checkHasLogined().then(isLogined => {
-      this.setData({
-        wxlogin: isLogined
-      })
-      if (isLogined) {
-        // 处理加入购物车的业务逻辑
-        this.addShopCarDone(options)
-      }
-    })
-  },
-  async addShopCarDone(options) {
-    const res = await WXAPI.shippingCarInfoAddItem(wx.getStorageSync('token'), options.goodsId, options.buyNumber, options.sku)
-    if (res.code == 30002) {
-      // 需要选择规格尺寸
-      const skuCurGoodsRes = await WXAPI.goodsDetail(options.goodsId)
-      if (skuCurGoodsRes.code != 0) {
-        wx.showToast({
-          title: skuCurGoodsRes.msg,
-          icon: 'none'
+    if (!curGood.propertyIds && !curGood.hasAddition) {
+      // 直接调用加入购物车方法
+      const res = await WXAPI.shippingCarInfoAddItem(wx.getStorageSync('token'), curGood.id, 1, [])
+      if (res.code == 2000) {
+        wx.navigateTo({
+            url: '/pages/login/index',
         })
         return
       }
-      const skuCurGoods = skuCurGoodsRes.data
-      skuCurGoods.basicInfo.storesBuy = 1
-      this.setData({
-        skuCurGoods
-      })
-      return
-    }
-    if (res.code != 0) {
-      wx.showToast({
-        title: res.msg,
-        icon: 'none'
-      })
-      return
-    }
-    wx.showToast({
-      title: '加入成功',
-      icon: 'success'
-    })
-    this.setData({
-      skuCurGoods: null
-    })
-  },
-  storesJia() {
-    const skuCurGoods = this.data.skuCurGoods
-    if (skuCurGoods.basicInfo.storesBuy < skuCurGoods.basicInfo.stores) {
-      skuCurGoods.basicInfo.storesBuy++
-      this.setData({
-        skuCurGoods
-      })
-    }
-  },
-  storesJian() {
-    const skuCurGoods = this.data.skuCurGoods
-    if (skuCurGoods.basicInfo.storesBuy > 1) {
-      skuCurGoods.basicInfo.storesBuy--
-      this.setData({
-        skuCurGoods
-      })
-    }
-  },
-  closeSku() {
-    this.setData({
-      skuCurGoods: null
-    })
-    wx.showTabBar()
-  },
-  skuSelect(e) {
-    const pid = e.currentTarget.dataset.pid
-    const id = e.currentTarget.dataset.id
-    // 处理选中
-    const skuCurGoods = this.data.skuCurGoods
-    const property = skuCurGoods.properties.find(ele => { return ele.id == pid })
-    property.childsCurGoods.forEach(ele => {
-      if (ele.id == id) {
-        ele.active = true
+      if (res.code == 30002) {
+        // 需要选择规格尺寸
+        this.setData({
+          skuCurGoods: curGood
+        })
+      } else if (res.code == 0) {
+        wx.showToast({
+          title: '加入成功',
+          icon: 'success'
+        })
+        wx.showTabBar()
+        TOOLS.showTabBarBadge() // 获取购物车数据，显示TabBarBadge
       } else {
-        ele.active = false
+        wx.showToast({
+          title: res.msg,
+          icon: 'none'
+        })
       }
-    })
-    this.setData({
-      skuCurGoods
-    })
-  },
-  addCarSku() {
-    const skuCurGoods = this.data.skuCurGoods
-    const propertySize = skuCurGoods.properties.length // 有几组SKU
-    const sku = []
-    skuCurGoods.properties.forEach(p => {
-      const o = p.childsCurGoods.find(ele => { return ele.active })
-      if (!o) {
-        return
-      }
-      sku.push({
-        optionId: o.propertyId,
-        optionValueId: o.id
+    } else {
+      // 需要选择 SKU 和 可选配件
+      this.setData({
+        skuCurGoods: curGood
       })
-    })
-    if (sku.length != propertySize) {
-      wx.showToast({
-        title: '请选择规格',
-        icon: 'none'
-      })
-      return
     }
-    const options = {
-      goodsId: skuCurGoods.basicInfo.id,
-      buyNumber: skuCurGoods.basicInfo.storesBuy,
-      sku
-    }
-    this.addShopCarDone(options)
   },
 })

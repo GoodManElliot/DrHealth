@@ -1,47 +1,93 @@
-const app = getApp()
+const CONFIG = require('../../config.js')
 const WXAPI = require('apifm-wxapi')
 const AUTH = require('../../utils/auth')
-const wxpay = require('../../utils/pay.js')
+
+Date.prototype.format = function(format) {
+  var date = {
+         "M+": this.getMonth() + 1,
+         "d+": this.getDate(),
+         "h+": this.getHours(),
+         "m+": this.getMinutes(),
+         "s+": this.getSeconds(),
+         "q+": Math.floor((this.getMonth() + 3) / 3),
+         "S+": this.getMilliseconds()
+  };
+  if (/(y+)/i.test(format)) {
+         format = format.replace(RegExp.$1, (this.getFullYear() + '').substr(4 - RegExp.$1.length));
+  }
+  for (var k in date) {
+         if (new RegExp("(" + k + ")").test(format)) {
+                format = format.replace(RegExp.$1, RegExp.$1.length == 1
+                       ? date[k] : ("00" + date[k]).substr(("" + date[k]).length));
+         }
+  }
+  return format;
+}
 
 Page({
   data: {
-    wxlogin: true,
-
     totalScoreToPay: 0,
     goodsList: [],
     isNeedLogistics: 0, // 是否需要物流信息
-    allGoodsPrice: 0,
     yunPrice: 0,
+    amountLogistics2: 0,
     allGoodsAndYunPrice: 0,
     goodsJsonStr: "",
-    orderType: "", //订单类型，购物车下单或立即支付下单，默认是购物车，
+    orderType: "", //订单类型，购物车下单或立即支付下单，默认是购物车， buyNow 说明是立即购买 
     pingtuanOpenId: undefined, //拼团的话记录团号
 
     hasNoCoupons: true,
     coupons: [],
-    youhuijine: 0, //优惠券金额
+    couponAmount: 0, //优惠券金额
     curCoupon: null, // 当前选择使用的优惠券
     curCouponShowText: '请选择使用优惠券', // 当前选择使用的优惠券
     peisongType: 'kd', // 配送方式 kd,zq 分别表示快递/到店自取
     remark: '',
     shopIndex: -1,
-    pageIsEnd: false
+    pageIsEnd: false,
+
+
+    bindMobileStatus: 0, // 0 未判断 1 已绑定手机号码 2 未绑定手机号码
+    userScore: 0, // 用户可用积分
+    deductionScore: '-1', // 本次交易抵扣的积分数， -1 为不抵扣，0 为自动抵扣，其他金额为抵扣多少积分
+    shopCarType: 0, //0自营购物车，1云货架购物车
+    dyopen: 0, // 是否开启订阅
+    dyunit: 0, // 按天
+    dyduration: 1, // 订阅间隔
+    dytimes: 1, // 订阅次数
+    dateStart: undefined, // 订阅首次扣费时间
+    minDate: new Date().getTime(),
+    maxDate: new Date(2030, 10, 1).getTime(),
+    currentDate: new Date().getTime(),
+    formatter: (type, value) => {
+      if (type === 'year') {
+        return `${value}年`;
+      } 
+      if (type === 'month') {
+        return `${value}月`;
+      }
+      if (type === 'day') {
+        return `${value}日`;
+      }
+      if (type === 'hour') {
+        return `${value}点`;
+      }
+      if (type === 'minute') {
+        return `${value}分`;
+      }
+      return value;
+    },
+    cardId: '0' // 使用的次卡ID
   },
-  onShow(){
+  onShow() {
     if (this.data.pageIsEnd) {
       return
     }
-    AUTH.checkHasLogined().then(isLogined => {
-      this.setData({
-        wxlogin: isLogined
-      })
-      if (isLogined) {
-        this.doneShow()
-      }
-    })
+    this.doneShow()
   },
   async doneShow() {
-    let goodsList = [];
+    let goodsList = []
+    let shopList = []
     const token = wx.getStorageSync('token')
     //立即购买下单
     if ("buyNow" == this.data.orderType) {
@@ -52,22 +98,73 @@ Page({
       }
     } else {
       //购物车下单
-      const res = await WXAPI.shippingCarInfo(token)
+      if (this.data.shopCarType == 0) {//自营购物车
+        var res = await WXAPI.shippingCarInfo(token)
+        shopList = res.data.shopList
+      } else if (this.data.shopCarType == 1) {//云货架购物车
+        var res = await WXAPI.jdvopCartInfoV2(token)
+        shopList = [{
+          id: 0,
+          name: '其他',
+          hasNoCoupons: true,
+          serviceDistance: 99999999
+        }]
+      }
       if (res.code == 0) {
-        goodsList = res.data.items
+        goodsList = res.data.items.filter(ele => {
+          return ele.selected
+        })
+        const shopIds = []
+        goodsList.forEach(ele => {
+          if (this.data.shopCarType == 1) {
+            ele.shopId = 0
+          }
+          shopIds.push(ele.shopId)
+        })
+        shopList = shopList.filter(ele => {
+          return shopIds.includes(ele.id)
+        })
       }
     }
+    shopList.forEach(ele => {
+      ele.hasNoCoupons = true
+    })
+    const extRequired = []; // 必填项
+    if (this.data.create_order_ext) {
+      const _create_order_ext = JSON.parse(this.data.create_order_ext)
+      goodsList.forEach(g => {
+        Object.keys(_create_order_ext).forEach(k => {
+          if (k.split(',').includes(g.goodsId + '')) {
+            console.log(1212, _create_order_ext[k]);
+            _create_order_ext[k].split(',').forEach(v => {
+              if (!extRequired.includes(v)) {
+                extRequired.push(v)
+              }
+            })
+          }
+        })
+      })
+    }
     this.setData({
+      shopList,
       goodsList,
-      peisongType: this.data.peisongType
+      peisongType: this.data.peisongType,
+      extRequired
     });
     this.initShippingAddress()
     this.userAmount()
   },
 
   onLoad(e) {
+    const nowDate = new Date();
     let _data = {
-      isNeedLogistics: 1
+      isNeedLogistics: 1,
+      dateStart: nowDate.format('yyyy-MM-dd h:m:s'),
+      orderPeriod_open: wx.getStorageSync('orderPeriod_open'),
+      order_pay_user_balance: wx.getStorageSync('order_pay_user_balance'),
+      zt_open_hx: wx.getStorageSync('zt_open_hx'),
+      create_order_ext: wx.getStorageSync('create_order_ext'),
+      needBindMobile: wx.getStorageSync('needBindMobile'),
     }
     if (e.orderType) {
       _data.orderType = e.orderType
@@ -75,13 +172,20 @@ Page({
     if (e.pingtuanOpenId) {
       _data.pingtuanOpenId = e.pingtuanOpenId
     }
-    this.setData(_data);
+    if (e.shopCarType) {
+      _data.shopCarType = e.shopCarType
+    }
+    this.setData(_data)
+    this.getUserApiInfo()
+    this.cardMyList()
   },
   async userAmount() {
     const res = await WXAPI.userAmount(wx.getStorageSync('token'))
+    const order_pay_user_balance = wx.getStorageSync('order_pay_user_balance')
     if (res.code == 0) {
       this.setData({
-        balance: res.data.balance
+        balance: order_pay_user_balance == '1' ? res.data.balance : 0,
+        userScore: res.data.score
       })
     }
   },
@@ -94,16 +198,32 @@ Page({
     }
     return aaa;
   },
-  remarkChange(e){
+  remarkChange(e) {
     this.data.remark = e.detail.value
   },
-  goCreateOrder(){
+  async goCreateOrder() {
+    this.setData({
+      btnLoading: true
+    })
+    // 检测实名认证状态
+    if (wx.getStorageSync('needIdCheck') == 1) {
+      const res = await WXAPI.userDetail(wx.getStorageSync('token'))
+      if (res.code == 0 && !res.data.base.isIdcardCheck) {
+        wx.navigateTo({
+          url: '/pages/idCheck/index',
+        })
+        this.setData({
+          btnLoading: false
+        })
+        return
+      }
+    }
     const subscribe_ids = wx.getStorageSync('subscribe_ids')
     if (subscribe_ids) {
       wx.requestSubscribeMessage({
         tmplIds: subscribe_ids.split(','),
         success(res) {
-          
+          console.log(res)
         },
         fail(e) {
           console.error(e)
@@ -114,117 +234,414 @@ Page({
       })
     } else {
       this.createOrder(true)
-    }    
+    }
   },
-  createOrder: function (e) {
-    var that = this;
-    var loginToken = wx.getStorageSync('token') // 用户登录 token
-    var remark = this.data.remark; // 备注信息
-
-    let postData = {
+  async createOrder(e) {
+    // shopCarType: 0 //0自营购物车，1云货架购物车
+    const loginToken = wx.getStorageSync('token') // 用户登录 token
+    const postData = {
       token: loginToken,
-      goodsJsonStr: that.data.goodsJsonStr,
-      remark: remark,
-      peisongType: that.data.peisongType
-    };
-    if (that.data.kjId) {
-      postData.kjid = that.data.kjId
+      goodsJsonStr: this.data.goodsJsonStr,
+      remark: this.data.remark,
+      peisongType: this.data.peisongType,
+      goodsType: this.data.shopCarType,
+      cardId: this.data.cardId,
     }
-    if (that.data.pingtuanOpenId) {
-      postData.pingtuanOpenId = that.data.pingtuanOpenId
+    if (this.data.deductionScore != '-1') {
+      postData.deductionScore = this.data.deductionScore
     }
-    if (postData.peisongType == 'kd' && that.data.curAddressData && that.data.curAddressData.provinceId) {
-      postData.provinceId = that.data.curAddressData.provinceId;
+    if (this.data.cardId == '0') {
+      postData.cardId = ''
     }
-    if (postData.peisongType == 'kd' && that.data.curAddressData && that.data.curAddressData.cityId) {
-      postData.cityId = that.data.curAddressData.cityId;
+    if (this.data.dyopen == 1) {
+      const orderPeriod = {
+        unit: this.data.dyunit,
+        duration: this.data.dyduration,
+        dateStart: this.data.dateStart,
+        times: this.data.dytimes,
+        autoPay: true
+      }
+      postData.orderPeriod = JSON.stringify(orderPeriod)
     }
-    if (postData.peisongType == 'kd' && that.data.curAddressData && that.data.curAddressData.districtId) {
-      postData.districtId = that.data.curAddressData.districtId;
+    if (this.data.kjId) {
+      postData.kjid = this.data.kjId
     }
-    if (e && that.data.isNeedLogistics > 0 && postData.peisongType == 'kd') {
-      if (!that.data.curAddressData) {
+    if (this.data.pingtuanOpenId) {
+      postData.pingtuanOpenId = this.data.pingtuanOpenId
+    }
+    if (postData.peisongType == 'kd' && this.data.curAddressData && this.data.curAddressData.provinceId) {
+      postData.provinceId = this.data.curAddressData.provinceId;
+    }
+    if (postData.peisongType == 'kd' && this.data.curAddressData && this.data.curAddressData.cityId) {
+      postData.cityId = this.data.curAddressData.cityId;
+    }
+    if (postData.peisongType == 'kd' && this.data.curAddressData && this.data.curAddressData.districtId) {
+      postData.districtId = this.data.curAddressData.districtId;
+    }
+    if (postData.peisongType == 'kd' && this.data.curAddressData && this.data.curAddressData.streetId) {
+      postData.streetId = this.data.curAddressData.streetId;
+    }
+    if (this.data.shopCarType == 1) {
+      // vop 需要地址来计算运费
+      postData.address = this.data.curAddressData.address;
+      postData.linkMan = this.data.curAddressData.linkMan;
+      postData.mobile = this.data.curAddressData.mobile;
+      postData.code = this.data.curAddressData.code;
+    }
+    if (e && this.data.isNeedLogistics > 0 && postData.peisongType == 'kd') {
+      if (!this.data.curAddressData) {
         wx.hideLoading();
         wx.showToast({
           title: '请设置收货地址',
           icon: 'none'
         })
+        this.setData({
+          btnLoading: false
+        })
         return;
       }
       if (postData.peisongType == 'kd') {
-        postData.address = that.data.curAddressData.address;
-        postData.linkMan = that.data.curAddressData.linkMan;
-        postData.mobile = that.data.curAddressData.mobile;
-        postData.code = that.data.curAddressData.code;
-      }      
+        postData.address = this.data.curAddressData.address;
+        postData.linkMan = this.data.curAddressData.linkMan;
+        postData.mobile = this.data.curAddressData.mobile;
+        postData.code = this.data.curAddressData.code;
+      }
     }
-    if (that.data.curCoupon) {
-      postData.couponId = that.data.curCoupon.id;
+    if (this.data.curCoupon) {
+      postData.couponId = this.data.curCoupon.id;
     }
     if (!e) {
       postData.calculate = "true";
     } else {
-      if(postData.peisongType == 'zq' && this.data.shops && this.data.shopIndex == -1) {
+      if (postData.peisongType == 'zq' && this.data.shops && this.data.shopIndex == -1) {
         wx.showToast({
           title: '请选择自提门店',
           icon: 'none'
         })
+        this.setData({
+          btnLoading: false
+        })
         return;
       }
-      if(postData.peisongType == 'zq' && this.data.shops) {
+      const extJsonStr = {}
+      if (this.data.extRequired && this.data.extRequired.length > 0) {
+        const extRequiredMap = this.data.extRequiredMap
+        if (!extRequiredMap) {
+          wx.showToast({
+            title: '请填写必填项',
+            icon: 'none'
+          })
+          this.setData({
+            btnLoading: false
+          })
+          return;
+        }
+        this.data.extRequired.forEach(k => {
+          if (!extRequiredMap[k]) {
+            wx.showToast({
+              title: '请填写' + k,
+              icon: 'none'
+            })
+            this.setData({
+              btnLoading: false
+            })
+            return;
+          }
+          extJsonStr[k] = extRequiredMap[k]
+        })
+      }
+      if (postData.peisongType == 'zq') {
+        if (!this.data.name) {
+          wx.showToast({
+            title: '请填写联系人',
+            icon: 'none'
+          })
+          this.setData({
+            btnLoading: false
+          })
+          return;
+        }
+        if (!this.data.mobile) {
+          wx.showToast({
+            title: '请填写联系电话',
+            icon: 'none'
+          })
+          this.setData({
+            btnLoading: false
+          })
+          return;
+        }
+        extJsonStr['联系人'] = this.data.name
+        extJsonStr['联系电话'] = this.data.mobile
+        postData.isCanHx = this.data.zt_open_hx == '1' ? true : false
+      }
+      if (postData.peisongType == 'zq' && this.data.shops) {
         postData.shopIdZt = this.data.shops[this.data.shopIndex].id
         postData.shopNameZt = this.data.shops[this.data.shopIndex].name
       }
+      postData.extJsonStr = JSON.stringify(extJsonStr)
     }
-
-    WXAPI.orderCreate(postData).then(function (res) {
-      that.data.pageIsEnd = true
+    const shopList = this.data.shopList
+    let totalRes = {
+      code: 0,
+      msg: 'success',
+      data: {
+        score: 0,
+        amountReal: 0,
+        orderIds: []
+      }
+    }
+    if (shopList && shopList.length > 1) {
+      // 多门店的商品下单
+      let totalScoreToPay = 0
+      let isNeedLogistics = false
+      let allGoodsAndYunPrice = 0
+      let yunPrice = 0
+      let amountLogistics2 = 0
+      let deductionMoney = 0
+      let couponAmount = 0
+      let goodsAdditionalPriceMap = {}
+      for (let index = 0; index < shopList.length; index++) {
+        const curShop = shopList[index]
+        console.log(curShop);
+        postData.filterShopId = curShop.id
+        if (curShop.curCoupon) {
+          postData.couponId = curShop.curCoupon.id
+        } else {
+          postData.couponId = ''
+        }
+        const res = await WXAPI.orderCreate(postData)
+        this.data.pageIsEnd = true
+        if (res.code != 0) {
+          this.data.pageIsEnd = false
+          wx.showModal({
+            title: '错误',
+            content: res.msg,
+            showCancel: false
+          })
+          this.setData({
+            btnLoading: false
+          })
+          return;
+        }
+        totalRes.data.score += res.data.score
+        totalRes.data.amountReal += res.data.amountReal
+        totalRes.data.orderIds.push(res.data.id)
+        console.log('e:', e);
+        if (!e) {
+          curShop.hasNoCoupons = true
+          console.log(curShop);
+          if (res.data.couponUserList) {
+            curShop.hasNoCoupons = false
+            res.data.couponUserList.forEach(ele => {
+              let moneyUnit = '元'
+              if (ele.moneyType == 1) {
+                moneyUnit = '%'
+              }
+              if (ele.moneyHreshold) {
+                ele.nameExt = ele.name + ' [面值' + ele.money + moneyUnit + '，满' + ele.moneyHreshold + '元可用]'
+              } else {
+                ele.nameExt = ele.name + ' [面值' + ele.money + moneyUnit + ']'
+              }
+            })
+            curShop.curCouponShowText = '请选择使用优惠券'
+            curShop.coupons = res.data.couponUserList
+            if (res.data.couponId && res.data.couponId.length > 0) {
+              curShop.curCoupon = curShop.coupons.find(ele => { return ele.id == res.data.couponId[0] })
+              curShop.curCouponShowText = curShop.curCoupon.nameExt
+            }
+          }
+          shopList.splice(index, 1, curShop)
+          // 计算积分抵扣规则 userScore
+          let scoreDeductionRules = res.data.scoreDeductionRules
+          if (scoreDeductionRules) {
+            // 如果可叠加，计算可抵扣的最大积分数
+            scoreDeductionRules.forEach(ele => {
+              if (ele.loop) {
+                let loopTimes = Math.floor(this.data.userScore / ele.score) // 按剩余积分取最大
+                let loopTimesMax = Math.floor((res.data.amountTotle + res.data.deductionMoney) / ele.money) // 按金额取最大
+                if (loopTimes > loopTimesMax) {
+                  loopTimes = loopTimesMax
+                }
+                ele.score = ele.score * loopTimes
+                ele.money = ele.money * loopTimes
+              }
+            })
+            // 剔除积分数为0的情况
+            scoreDeductionRules = scoreDeductionRules.filter(ele => {
+              return ele.score > 0
+            })
+            curShop.scoreDeductionRules = scoreDeductionRules
+            shopList.splice(index, 1, curShop)
+          }
+          totalScoreToPay += res.data.score
+          if (res.data.isNeedLogistics) {
+            isNeedLogistics = true
+          }
+          allGoodsAndYunPrice += res.data.amountReal
+          yunPrice += res.data.amountLogistics
+          amountLogistics2 += res.data.amountLogistics2 || 0
+          deductionMoney += res.data.deductionMoney
+          couponAmount += res.data.couponAmount
+          goodsAdditionalPriceMap = Object.assign(goodsAdditionalPriceMap, res.data.goodsAdditionalPriceMap)
+        }
+      }
+      this.setData({
+        shopList,
+        totalScoreToPay,
+        isNeedLogistics,
+        allGoodsAndYunPrice,
+        goodsAdditionalPriceMap,
+        yunPrice,
+        amountLogistics2,
+        hasNoCoupons: true,
+        deductionMoney,
+        couponAmount
+      });
+    } else {
+      // 单门店单商品下单
+      if (shopList && shopList.length == 1) {
+        if (shopList[0].curCoupon) {
+          postData.couponId = shopList[0].curCoupon.id
+        } else {
+          postData.couponId = ''
+        }
+      }
+      const res = await WXAPI.orderCreate(postData)
+      this.data.pageIsEnd = true
       if (res.code != 0) {
-        that.data.pageIsEnd = false
+        this.data.pageIsEnd = false
         wx.showModal({
           title: '错误',
           content: res.msg,
           showCancel: false
         })
+        this.setData({
+          btnLoading: false
+        })
         return;
       }
-
-      if (e && "buyNow" != that.data.orderType) {
-        // 清空购物车数据
-        WXAPI.shippingCarInfoRemoveAll(loginToken)
-      }
+      totalRes = res
       if (!e) {
         let hasNoCoupons = true
         let coupons = null
         if (res.data.couponUserList) {
           hasNoCoupons = false
           res.data.couponUserList.forEach(ele => {
-            ele.nameExt = ele.name + ' [满' + ele.moneyHreshold + '元可减' + ele.money + '元]'
+            let moneyUnit = '元'
+            if (ele.moneyType == 1) {
+              moneyUnit = '%'
+            }
+            if (ele.moneyHreshold) {
+              ele.nameExt = ele.name + ' [面值' + ele.money + moneyUnit + '，满' + ele.moneyHreshold + '元可用]'
+            } else {
+              ele.nameExt = ele.name + ' [面值' + ele.money + moneyUnit + ']'
+            }
           })
           coupons = res.data.couponUserList
+          if (shopList && shopList.length == 1 && !hasNoCoupons) {
+            hasNoCoupons = true
+            const curShop = shopList[0]
+            curShop.hasNoCoupons = false
+            curShop.curCouponShowText = '请选择使用优惠券'
+            curShop.coupons = res.data.couponUserList
+            if (res.data.couponId && res.data.couponId.length > 0) {
+              curShop.curCoupon = curShop.coupons.find(ele => { return ele.id == res.data.couponId[0] })
+              curShop.curCouponShowText = curShop.curCoupon.nameExt
+            }
+            shopList[0] = curShop
+          }
         }
-        
-        that.setData({
+        // 计算积分抵扣规则 userScore
+        let scoreDeductionRules = res.data.scoreDeductionRules
+        if (scoreDeductionRules) {
+          // 如果可叠加，计算可抵扣的最大积分数
+          scoreDeductionRules.forEach(ele => {
+            if (ele.loop) {
+              let loopTimes = Math.floor(this.data.userScore / ele.score) // 按剩余积分取最大
+              let loopTimesMax = Math.floor((res.data.amountTotle + res.data.deductionMoney) / ele.money) // 按金额取最大
+              if (loopTimes > loopTimesMax) {
+                loopTimes = loopTimesMax
+              }
+              ele.score = ele.score * loopTimes
+              ele.money = ele.money * loopTimes
+            }
+          })
+          // 剔除积分数为0的情况
+          scoreDeductionRules = scoreDeductionRules.filter(ele => {
+            return ele.score > 0
+          })
+        }
+        this.setData({
+          shopList,
           totalScoreToPay: res.data.score,
           isNeedLogistics: res.data.isNeedLogistics,
-          allGoodsPrice: res.data.amountTotle,
           allGoodsAndYunPrice: res.data.amountReal,
+          goodsAdditionalPriceMap: res.data.goodsAdditionalPriceMap,
           yunPrice: res.data.amountLogistics,
+          amountLogistics2: res.data.amountLogistics2,
           hasNoCoupons,
-          coupons
-        });
-        that.data.pageIsEnd = false
-        return;
+          coupons,
+          deductionMoney: res.data.deductionMoney,
+          couponAmount: res.data.couponAmount,
+          scoreDeductionRules
+        })
       }
-      that.processAfterCreateOrder(res)
-    })
+    }
+    if (!e) {
+      this.data.pageIsEnd = false
+      return
+    }
+    if (e && "buyNow" != this.data.orderType) {
+      // 清空购物车数据
+      const keyArrays = []
+      this.data.goodsList.forEach(ele => {
+        keyArrays.push(ele.key)
+      })
+      if (this.data.shopCarType == 0) { //自营购物车
+        WXAPI.shippingCarInfoRemoveItem(loginToken, keyArrays.join())
+      } else if (this.data.shopCarType == 1) {//云货架购物车
+        WXAPI.jdvopCartRemoveV2(loginToken, keyArrays.join())
+      }
+    }
+    this.processAfterCreateOrder(totalRes)
   },
   async processAfterCreateOrder(res) {
+    this.setData({
+      btnLoading: false
+    })
+    if (res.data.status != 0) {
+      wx.redirectTo({
+        url: "/pages/order-list/index"
+      })
+      return
+    }
+    let orderId = ''
+    if (res.data.orderIds && res.data.orderIds.length > 0) {
+      orderId = res.data.orderIds.join()
+    } else {
+      orderId = res.data.id
+    }
     // 直接弹出支付，取消支付的话，去订单列表
+    await this.userAmount()
     const balance = this.data.balance
-    if (balance || res.data.amountReal*1 == 0) {
+    const userScore = this.data.userScore
+    if (userScore < res.data.score) {
+      wx.showModal({
+        title: '提示',
+        content: '您当前可用积分不足，请稍后前往订单管理进行支付',
+        showCancel: false,
+        success: res2 => {
+          wx.redirectTo({
+            url: "/pages/order-list/index"
+          })
+        }
+      })
+      return
+    }
+    if (balance || res.data.amountReal * 1 == 0) {
       // 有余额
-      const money = res.data.amountReal * 1 - balance*1
+      const money = (res.data.amountReal * 1 - balance * 1).toFixed(2)
       if (money <= 0) {
         // 余额足够
         wx.showModal({
@@ -235,7 +652,7 @@ Page({
           success: res2 => {
             if (res2.confirm) {
               // 使用余额支付
-              WXAPI.orderPay(wx.getStorageSync('token'), res.data.id).then(res3 => {
+              WXAPI.orderPay(wx.getStorageSync('token'), orderId).then(res3 => {
                 if (res3.code != 0) {
                   wx.showToast({
                     title: res3.msg,
@@ -264,7 +681,15 @@ Page({
           success: res2 => {
             if (res2.confirm) {
               // 使用余额支付
-              wxpay.wxpay('order', money, res.data.id, "/pages/order-list/index");
+              this.setData({
+                orderId,
+                money,
+                paymentShow: true,
+                nextAction: {
+                  type: 0,
+                  id: orderId
+                }
+              })
             } else {
               wx.redirectTo({
                 url: "/pages/order-list/index"
@@ -275,7 +700,15 @@ Page({
       }
     } else {
       // 没余额
-      wxpay.wxpay('order', res.data.amountReal, res.data.id, "/pages/order-list/index");
+      this.setData({
+        orderId,
+        money: res.data.amountReal,
+        paymentShow: true,
+        nextAction: {
+          type: 0,
+          id: orderId
+        }
+      })
     }
   },
   async initShippingAddress() {
@@ -337,6 +770,10 @@ Page({
       goodsJsonStr.push(_goodsJsonStr)
 
     }
+    if (this.data.shopCarType == 1) {
+      // vop 商品必须快递
+      isNeedLogistics = 1
+    }
     this.setData({
       isNeedLogistics: isNeedLogistics,
       goodsJsonStr: JSON.stringify(goodsJsonStr)
@@ -356,13 +793,25 @@ Page({
   bindChangeCoupon: function (e) {
     const selIndex = e.detail.value;
     this.setData({
-      youhuijine: this.data.coupons[selIndex].money,
       curCoupon: this.data.coupons[selIndex],
       curCouponShowText: this.data.coupons[selIndex].nameExt
     });
     this.processYunfei()
   },
-  radioChange (e) {
+  bindChangeCouponShop: function (e) {
+    const selIndex = e.detail.value;
+    const shopIndex = e.currentTarget.dataset.sidx
+    const shopList = this.data.shopList
+    const curshop = shopList[shopIndex]
+    curshop.curCoupon = curshop.coupons[selIndex]
+    curshop.curCouponShowText = curshop.coupons[selIndex].nameExt
+    shopList.splice(shopIndex, 1, curshop)
+    this.setData({
+      shopList
+    });
+    this.processYunfei()
+  },
+  radioChange(e) {
     this.setData({
       peisongType: e.detail.value
     })
@@ -371,20 +820,20 @@ Page({
       this.fetchShops()
     }
   },
+  dyChange(e) {
+    this.setData({
+      dyopen: e.detail.value
+    })
+  },
+  dyunitChange(e) {
+    this.setData({
+      dyunit: e.detail.value
+    })
+  },
   cancelLogin() {
     wx.navigateBack()
   },
-  processLogin(e) {
-    if (!e.detail.userInfo) {
-      wx.showToast({
-        title: '已取消',
-        icon: 'none',
-      })
-      return;
-    }
-    AUTH.register(this);
-  },
-  async fetchShops(){
+  async fetchShops() {
     const res = await WXAPI.fetchShops()
     if (res.code == 0) {
       let shopIndex = this.data.shopIndex
@@ -420,6 +869,122 @@ Page({
     const shop = this.data.shops[this.data.shopIndex]
     wx.makePhoneCall({
       phoneNumber: shop.linkPhone,
+    })
+  },
+  async getUserApiInfo() {
+    const res = await WXAPI.userDetail(wx.getStorageSync('token'))
+    if (res.code == 0) {
+      let bindMobileStatus = res.data.base.mobile ? 1 : 2 // 账户绑定的手机号码状态
+      if (this.data.needBindMobile != 1) {
+        bindMobileStatus = 1
+      }
+      this.setData({
+        bindMobileStatus,
+        mobile: res.data.base.mobile,
+        name: res.data.base.nick,
+      })
+    }
+  },
+  bindMobile() {
+    this.setData({
+      bindMobileShow: true
+    })
+  },
+  bindMobileOk(e) {
+    console.log(e.detail); // 这里是组件里data的数据
+    this.setData({
+      bindMobileShow: false,
+      mobile: e.detail.mobile,
+      bindMobileStatus: 1
+    })
+  },
+  bindMobileCancel() {
+    this.setData({
+      bindMobileShow: false
+    })
+  },
+  deductionScoreChange(event) {
+    this.setData({
+      deductionScore: event.detail,
+    })
+    this.processYunfei()
+  },
+  deductionScoreClick(event) {
+    const {
+      name
+    } = event.currentTarget.dataset;
+    this.setData({
+      deductionScore: name,
+    })
+    this.processYunfei()
+  },
+  cardChange(event) {
+    this.setData({
+      cardId: event.detail,
+    })
+    this.processYunfei()
+  },
+  cardClick(event) {
+    const {
+      name
+    } = event.currentTarget.dataset;
+    this.setData({
+      cardId: name,
+    })
+    this.processYunfei()
+  },
+  dateStartclick(e) {
+    this.setData({
+      dateStartpop: true
+    })
+  },
+  dateStartconfirm(e) {
+    const d = new Date(e.detail)
+    this.setData({
+      dateStart: d.format('yyyy-MM-dd h:m:s'),
+      dateStartpop: false
+    })
+    console.log(e);
+  },
+  dateStartcancel(e) {
+    this.setData({
+      dateStartpop: false
+    })
+  },
+  async cardMyList() {
+    const res = await WXAPI.cardMyList(wx.getStorageSync('token'))
+    if (res.code == 0) {
+      const myCards = res.data.filter(ele => { return ele.status == 0 && ele.amount > 0 && ele.cardInfo.refs })
+      if (myCards.length > 0) {
+        this.setData({
+          myCards: res.data
+        })
+      }
+    }
+  },
+  paymentOk(e) {
+    console.log(e.detail); // 这里是组件里data的数据
+    this.setData({
+      paymentShow: false
+    })
+    wx.redirectTo({
+      url: '/pages/order-list/index',
+    })
+  },
+  paymentCancel() {
+    this.setData({
+      paymentShow: false
+    })
+  },
+  extRequiredChange(e) {
+    let extRequiredMap = this.data.extRequiredMap
+    if (!extRequiredMap) {
+      extRequiredMap = {}
+    }
+    extRequiredMap[e.target.dataset.name] = e.detail
+    console.log(extRequiredMap);
+    this.setData({
+      extRequiredMap
     })
   },
 })

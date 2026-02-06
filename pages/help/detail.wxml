@@ -1,3 +1,97 @@
-<view class="content">
-  <parser html="{{cmsArticleDetail.content}}" />
+<view class="article-detail-container">
+  <!-- 文章头部信息 -->
+  <view class="article-header">
+    <view class="article-title">{{cmsArticleDetail.title}}</view>
+    
+    <!-- 文章元信息 -->
+    <view class="article-meta">
+      <view class="meta-row">
+        <view class="author-info" wx:if="{{cmsArticleDetail.author}}">
+          <text class="author-icon">👤</text>
+          <text class="author-name">{{cmsArticleDetail.author}}</text>
+        </view>
+        <view class="publish-time">{{cmsArticleDetail.dateAdd || cmsArticleDetail.createTime}}</view>
+      </view>
+      
+      <view class="meta-row">
+        <view class="read-info">
+          <text class="read-icon">👁</text>
+          <text class="read-count">{{cmsArticleDetail.displayVv || 0}} 阅读</text>
+        </view>
+        <view class="comment-info" wx:if="{{cmsArticleDetail.commentCount}}">
+          <text class="comment-icon">💬</text>
+          <text class="comment-count">{{cmsArticleDetail.commentCount}} 评论</text>
+        </view>
+      </view>
+    </view>
+    
+    <!-- 文章摘要 -->
+    <view class="article-summary" wx:if="{{cmsArticleDetail.summary}}">
+      {{cmsArticleDetail.summary}}
+    </view>
+  </view>
+
+  <!-- 文章内容 -->
+  <view class="article-content">
+    <mp-html content="{{cmsArticleDetail.content}}" />
+  </view>
+  
+  <!-- 文章底部操作区 -->
+  <view class="article-footer" wx:if="{{source === 'zhenyou'}}">
+    <view class="footer-actions">
+      <!-- 臻友分享页面显示评论按钮 -->
+      <view class="action-item" bindtap="scrollToComments">
+        <text class="action-icon">💬</text>
+        <text class="action-text">评论</text>
+      </view>
+    </view>
+  </view>
+  
+  <!-- 评论区域 -->
+  <view class="comments-section">
+    <view class="comments-header">
+      <text class="comments-title">评论 ({{comments.length}})</text>
+    </view>
+    
+    <!-- 评论列表 -->
+    <view class="comments-list" wx:if="{{comments.length > 0}}">
+      <view class="comment-item" wx:for="{{comments}}" wx:key="id">
+        <view class="comment-avatar">
+          <image 
+            src="{{item.user.avatarUrl}}" 
+            mode="aspectFill" 
+            class="avatar-image"
+            lazy-load
+          />
+        </view>
+        <view class="comment-content">
+          <view class="comment-user">{{item.user.nick}}</view>
+          <view class="comment-text">{{item.content}}</view>
+          <view class="comment-time">{{item.dateAdd}}</view>
+        </view>
+      </view>
+    </view>
+    
+    <!-- 暂无评论 -->
+    <view class="no-comments" wx:if="{{comments.length === 0}}">
+      <text>暂无评论，快来抢沙发吧~</text>
+    </view>
+  </view>
+  
+  <!-- 评论输入框 -->
+  <view class="comment-input-container">
+    <view class="comment-input-wrapper">
+      <input 
+        class="comment-input" 
+        placeholder="写下你的想法..." 
+        value="{{commentText}}"
+        bindinput="onCommentInput"
+        confirm-type="send"
+        bindconfirm="submitComment"
+      />
+      <view class="comment-send-btn" bindtap="submitComment">
+        <text>发送</text>
+      </view>
+    </view>
+  </view>
 </view>

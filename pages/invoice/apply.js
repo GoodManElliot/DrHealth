@@ -1,45 +1,29 @@
 const WXAPI = require('apifm-wxapi')
-const AUTH = require('../../utils/auth')
-
 Page({
 
   /**
    * 页面的初始数据
    */
   data: {
-    wxlogin: true,
   },
 
   /**
    * 生命周期函数--监听页面加载
    */
-  onLoad: function (options) {
-
+  onLoad(e) {
+    // 读取分享链接中的邀请人编号
+    if (e && e.inviter_id) {
+      wx.setStorageSync('referrer', e.inviter_id)
+    }
   },
-
-  /**
-   * 生命周期函数--监听页面初次渲染完成
-   */
-  onReady: function () {
-
-  },
-
-  /**
-   * 生命周期函数--监听页面显示
-   */
-  onShow: function () {
-    AUTH.checkHasLogined().then(isLogined => {
-      this.setData({
-        wxlogin: isLogined
-      })
-    })    
+  onShow() {
   },
   chooseInvoiceTitle(){
     wx.chooseInvoiceTitle({
       success: (res) => {
         this.setData({
           wxInvoiceInfo: res
-        })    
+        })
       },
       fail: err => {
         console.error(err);
@@ -50,52 +34,40 @@ Page({
       }
     })
   },
-  /**
-   * 生命周期函数--监听页面隐藏
-   */
-  onHide: function () {
-
-  },
-
-  /**
-   * 生命周期函数--监听页面卸载
-   */
-  onUnload: function () {
-
-  },
-
-  /**
-   * 页面相关事件处理函数--监听用户下拉动作
-   */
-  onPullDownRefresh: function () {
-
-  },
-
-  /**
-   * 页面上拉触底事件的处理函数
-   */
-  onReachBottom: function () {
-
-  },
-
-  /**
-   * 用户点击右上角分享
-   */
   onShareAppMessage() {    
     return {
       title: '申请开票',
-      imageUrl: 'https://cdn.it120.cc/apifactory/2019/06/13/13f5f43c-4819-414d-88f5-968e32facd79.png',
-      path: '/pages/invoice/apply?inviter_id=' + wx.getStorageSync('uid')
+      path: '/pages/invoice/apply?inviter_id=' + wx.getStorageSync('uid'),
+      imageUrl: wx.getStorageSync('invoice_share_pic')
+    }
+  },
+  onShareTimeline() {
+    return {
+      title: '申请开票',
+      query: 'inviter_id=' + wx.getStorageSync('uid'),
+      imageUrl: wx.getStorageSync('invoice_share_pic')
     }
   },
   async bindSave(e) {
-    const isLogined = await AUTH.checkHasLogined()
-    if (!isLogined) {
-      this.setData({
-        wxlogin: false
+    const invoice_subscribe_ids = wx.getStorageSync('invoice_subscribe_ids')
+    if (invoice_subscribe_ids) {
+      wx.requestSubscribeMessage({
+        tmplIds: invoice_subscribe_ids.split(','),
+        success(res) {
+          console.log(res)
+        },
+        fail(err) {
+          console.error(err)
+        },
+        complete: (res) => {
+          this._bindSave(e)
+        },
       })
-      return
+    } else {
+      this._bindSave(e)
     }
+  },
+  async _bindSave(e) {
     // 提交保存
     let comName = e.detail.value.comName;
     let tfn = e.detail.value.tfn;
@@ -103,6 +75,7 @@ Page({
     let amount = e.detail.value.amount;
     let consumption = e.detail.value.consumption;
     let remark = e.detail.value.remark;
+    let email = e.detail.value.email
     let address = e.detail.value.address;
     let bank = e.detail.value.bank;
     if (!mobile) {
@@ -133,6 +106,13 @@ Page({
       })
       return
     }
+    if (!email) {
+      wx.showToast({
+        title: '请填写邮箱地址',
+        icon: 'none'
+      })
+      return
+    }
     if (!amount || amount*1 < 100) {
       wx.showToast({
         title: '开票金额不能低于100',
@@ -151,8 +131,15 @@ Page({
       amount,
       consumption,
       remark,
+      email,
       extJsonStr: JSON.stringify(extJsonStr)
     }).then(res => {
+      if (res.code == 2000) {
+        wx.navigateTo({
+            url: '/pages/login/index',
+        })
+        return
+      }
       if (res.code == 0) {
         wx.showModal({
           title: '成功',
@@ -174,20 +161,5 @@ Page({
         })
       }
     })
-  },
-  cancelLogin() {
-    this.setData({
-      wxlogin: true
-    })
-  },
-  processLogin(e) {
-    if (!e.detail.userInfo) {
-      wx.showToast({
-        title: '已取消',
-        icon: 'none',
-      })
-      return;
-    }
-    AUTH.register(this);
   },
 })

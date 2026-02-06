@@ -1,5 +1,5 @@
 const WXAPI = require('apifm-wxapi')
-
+const CONFIG = require('../config.js')
 async function checkSession(){
   return new Promise((resolve, reject) => {
     wx.checkSession({
@@ -10,6 +10,21 @@ async function checkSession(){
         return resolve(false)
       }
     })
+  })
+}
+
+async function bindSeller() {
+  const token = wx.getStorageSync('token')
+  const referrer = wx.getStorageSync('referrer')
+  if (!token) {
+    return
+  }
+  if (!referrer) {
+    return
+  }
+  const res = await WXAPI.bindSeller({
+    token,
+    uid: referrer
   })
 }
 
@@ -49,81 +64,186 @@ async function wxaCode(){
   })
 }
 
-async function getUserInfo() {
+async function login(page){
+  const _this = this
+  wx.login({
+    success: function (res) {
+      const extConfigSync = wx.getExtConfigSync()
+      if (extConfigSync.subDomain) {
+        WXAPI.wxappServiceLogin({
+          code: res.code
+        }).then(function (res) {        
+          if (res.code == 10000) {
+            // 去注册
+            return;
+          }
+          if (res.code != 0) {
+            // 登录错误
+            wx.showModal({
+              title: '无法登录',
+              content: res.msg,
+              showCancel: false
+            })
+            return;
+          }
+          wx.setStorageSync('token', res.data.token)
+          wx.setStorageSync('uid', res.data.uid)
+          if (CONFIG.bindSeller) {
+            _this.bindSeller()
+          }
+          if ( page ) {
+            page.onShow()
+          }
+        })
+      } else {
+        WXAPI.login_wx(res.code).then(function (res) {        
+          if (res.code == 10000) {
+            // 去注册
+            return;
+          }
+          if (res.code != 0) {
+            // 登录错误
+            wx.showModal({
+              title: '无法登录',
+              content: res.msg,
+              showCancel: false
+            })
+            return;
+          }
+          wx.setStorageSync('token', res.data.token)
+          wx.setStorageSync('uid', res.data.uid)
+          if (CONFIG.bindSeller) {
+            _this.bindSeller()
+          }
+          if ( page ) {
+            page.onShow()
+          }
+        })
+      }
+    }
+  })
+}
+
+async function authorize() {
+  // const code = await wxaCode()
+  // const resLogin = await WXAPI.login_wx(code)
+  // if (resLogin.code == 0) {
+  //   wx.setStorageSync('token', resLogin.data.token)
+  //   wx.setStorageSync('uid', resLogin.data.uid)
+  //   return resLogin
+  // }
   return new Promise((resolve, reject) => {
-    wx.getUserInfo({
-      success: res => {
-        return resolve(res)
+    wx.login({
+      success: function (res) {
+        const code = res.code
+        let referrer = '' // 推荐人
+        let referrer_storge = wx.getStorageSync('referrer');
+        if (referrer_storge) {
+          referrer = referrer_storge;
+        }
+        // 下面开始调用注册接口
+        const extConfigSync = wx.getExtConfigSync()
+        if (extConfigSync.subDomain) {
+          WXAPI.wxappServiceAuthorize({
+            code: code,
+            referrer: referrer
+          }).then(function (res) {
+            if (res.code == 0) {
+              wx.setStorageSync('token', res.data.token)
+              wx.setStorageSync('uid', res.data.uid)
+              resolve(res)
+            } else {
+              wx.showToast({
+                title: res.msg,
+                icon: 'none'
+              })
+              reject(res.msg)
+            }
+          })
+        } else {
+          WXAPI.authorize({
+            code: code,
+            referrer: referrer
+          }).then(function (res) {
+            if (res.code == 0) {
+              wx.setStorageSync('token', res.data.token)
+              wx.setStorageSync('uid', res.data.uid)
+              resolve(res)
+            } else {
+              wx.showToast({
+                title: res.msg,
+                icon: 'none'
+              })
+              reject(res.msg)
+            }
+          })
+        }
       },
       fail: err => {
-        console.error(err)
-        return resolve()
+        reject(err)
       }
     })
   })
 }
 
-async function login(page){
-  const _this = this
-  wx.login({
-    success: function (res) {
-      WXAPI.login_wx(res.code).then(function (res) {        
-        if (res.code == 10000) {
-          // 去注册
-          //_this.register(page)
-          return;
-        }
-        if (res.code != 0) {
-          // 登录错误
-          wx.showModal({
-            title: '无法登录',
-            content: res.msg,
-            showCancel: false
-          })
-          return;
-        }
-        wx.setStorageSync('token', res.data.token)
-        wx.setStorageSync('uid', res.data.uid)
-        if ( page ) {
-          page.onShow()
-        }
-      })
+// 最新的登陆接口，建议用这个
+async function login20241025() {
+  const code = await wxaCode()
+  const extConfigSync = wx.getExtConfigSync()
+  if (extConfigSync.subDomain) {
+    // 服务商模式
+    const res = await WXAPI.wxappServiceLogin({ code })
+    if (res.code == 10000) {
+      // 去注册
+      return res
     }
-  })
-}
-
-async function register(page) {
-  let _this = this;
-  wx.login({
-    success: function (res) {
-      let code = res.code; // 微信登录接口返回的 code 参数，下面注册接口需要用到
-      wx.getUserInfo({
-        success: function (res) {
-          let iv = res.iv;
-          let encryptedData = res.encryptedData;
-          let referrer = '' // 推荐人
-          let referrer_storge = wx.getStorageSync('referrer');
-          if (referrer_storge) {
-            referrer = referrer_storge;
-          }
-          // 下面开始调用注册接口
-          WXAPI.register_complex({
-            code: code,
-            encryptedData: encryptedData,
-            iv: iv,
-            referrer: referrer
-          }).then(function (res) {
-            _this.login(page);
-          })
-        }
+    if (res.code != 0) {
+      // 登录错误
+      wx.showModal({
+        content: res.msg,
+        showCancel: false
       })
+      return res
     }
-  })
+    wx.setStorageSync('token', res.data.token)
+    wx.setStorageSync('uid', res.data.uid)
+    wx.setStorageSync('openid', res.data.openid)
+    wx.setStorageSync('mobile', res.data.mobile)
+    if (CONFIG.bindSeller) {
+      this.bindSeller()
+    }
+    return res
+  } else {
+    // 非服务商模式
+    const res = await WXAPI.login_wx(code)
+    if (res.code == 10000) {
+      // 去注册
+      return res;
+    }
+    if (res.code != 0) {
+      // 登录错误
+      wx.showModal({
+        content: res.msg,
+        showCancel: false
+      })
+      return res;
+    }
+    wx.setStorageSync('token', res.data.token)
+    wx.setStorageSync('uid', res.data.uid)
+    wx.setStorageSync('openid', res.data.openid)
+    wx.setStorageSync('mobile', res.data.mobile)
+    if (CONFIG.bindSeller) {
+      this.bindSeller()
+    }
+    return res
+  }
 }
 
 function loginOut(){
   wx.removeStorageSync('token')
   wx.removeStorageSync('uid')
+  wx.removeStorageSync('openid')
+  wx.removeStorageSync('mobile')
 }
 
 async function checkAndAuthorize (scope) {
@@ -172,13 +292,13 @@ async function checkAndAuthorize (scope) {
   })  
 }
 
-
 module.exports = {
   checkHasLogined: checkHasLogined,
   wxaCode: wxaCode,
-  getUserInfo: getUserInfo,
   login: login,
-  register: register,
+  login20241025: login20241025,
   loginOut: loginOut,
-  checkAndAuthorize: checkAndAuthorize
+  checkAndAuthorize: checkAndAuthorize,
+  authorize: authorize,
+  bindSeller: bindSeller
 }

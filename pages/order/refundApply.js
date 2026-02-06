@@ -1,24 +1,28 @@
 const WXAPI = require('apifm-wxapi')
+const CONFIG = require('../../config.js')
 Page({
   data: {
+    autosize: {
+      minHeight: 100
+    },
     orderId: 1,
+    number: 0,
     amount: 999.00,
 
-    refundApplyDetail: undefined,
-
-    type: 0,
+    type: '0',
     typeItems: [
       { name: '我要退款(无需退货)', value: '0', checked: true },
       { name: '我要退货退款', value: '1' },
       { name: '我要换货', value: '2' },
     ],
 
-    logisticsStatus:0,
+    logisticsStatus:'0',
     logisticsStatusItems: [
       { name: '未收到货', value: '0', checked: true },
       { name: '已收到货', value: '1' }
     ],
 
+    reason: '不喜欢/不想要',
     reasons: [
       "不喜欢/不想要", 
       "空包裹", 
@@ -41,47 +45,97 @@ Page({
   onLoad: function (e) {
     this.setData({
       orderId: e.id,
-      amount: e.amount
-    });
+      amount: e.amount,
+      customerServiceType: CONFIG.customerServiceType,
+    })
+    this.orderDetail()
   },
   onShow(){
-    const _this = this
-    WXAPI.refundApplyDetail(wx.getStorageSync('token'), _this.data.orderId).then(res => {
-      if (res.code == 0) {
-        _this.setData({
-          refundApplyDetail: res.data[0]  // baseInfo, pics
+  },
+  async orderDetail() {
+    const token = wx.getStorageSync('token')
+    const res = await WXAPI.orderDetail(token, this.data.orderId)
+    if (res.code != 0) {
+      wx.showModal({
+        content: res.msg,
+        success: (res) => {
+          wx.navigateBack()
+        }
+      })
+      return
+    }
+    res.data.goods.forEach(ele => {
+      if (ele.afterSale) {
+        ele.afterSale.split(',').forEach(a => {
+          ele['afterSale' + a] = true
         })
       }
     })
-  },
-  refundApplyCancel(){
-    const _this = this
-    WXAPI.refundApplyCancel(wx.getStorageSync('token'), _this.data.orderId).then(res => {
-      if (res.code == 0) {
-        wx.navigateTo({
-          url: "/pages/order-list/index"
-        })
-      }
-    })
-  },
-  typeItemsChange: function (e) {
-    const typeItems = this.data.typeItems;
-    for (var i = 0, len = typeItems.length; i < len; ++i) {
-      typeItems[i].checked = typeItems[i].value == e.detail.value;
+    // 读取已申请售后记录
+    const res2 = await WXAPI.refundApplyDetail(token, this.data.orderId)
+    let refundApplyList = []
+    if (res2.code == 0) {
+      res2.data.forEach(ele => {
+        ele.goodInfo = res.data.goods.find(g => g.id == ele.baseInfo.orderGoodsId)
+        console.log(ele.goodInfo);
+      })
+      refundApplyList = res2.data
     }
     this.setData({
-      typeItems: typeItems,
-      type: e.detail.value
+      goods: res.data.goods,
+      refundApplyList
+    })
+  },
+  async refundApplyCancel(){
+    wx.showLoading({
+      title: '',
+    })
+    const res = await WXAPI.refundApplyCancel(wx.getStorageSync('token'), this.data.curRufund.baseInfo.orderId, this.data.curRufund.baseInfo.orderGoodsId)
+    wx.hideLoading()
+    if (res.code == 0) {
+      wx.showToast({
+        title: '已取消',
+      })
+      this.popClose()
+      this.orderDetail()
+    } else {
+      wx.showToast({
+        title: res.msg,
+        icon: 'none'
+      })
+    }
+  },
+  typeChange(event) {
+    this.setData({
+      type: event.detail,
     });
   },
-  logisticsStatusItemsChange: function (e) {
-    const logisticsStatusItems = this.data.logisticsStatusItems;
-    for (var i = 0, len = logisticsStatusItems.length; i < len; ++i) {
-      logisticsStatusItems[i].checked = logisticsStatusItems[i].value == e.detail.value;
-    }
+  typeClick(event) {
+    const { name } = event.currentTarget.dataset;
     this.setData({
-      logisticsStatusItems: logisticsStatusItems,
-      logisticsStatus: e.detail.value
+      type: name,
+    });
+  },
+  logisticsStatusChange(event) {
+    this.setData({
+      logisticsStatus: event.detail,
+    });
+  },
+  logisticsStatusClick(event) {
+    const { name } = event.currentTarget.dataset;
+    this.setData({
+      logisticsStatus: name,
+    });
+  },
+  reasonChange(event) {
+    this.setData({
+      reason: event.detail,
+    });
+  },
+  reasonClick(event) {
+    const { name } = event.currentTarget.dataset;
+    this.setData({
+      reason: name,
     });
   },
   reasonChange: function (e) {
@@ -89,17 +143,21 @@ Page({
       reasonIndex: e.detail.value
     })
   },
-  chooseImage: function (e) {
-    const that = this;
-    wx.chooseImage({
-      sizeType: ['original', 'compressed'], // 可以指定是原图还是压缩图，默认二者都有
-      sourceType: ['album', 'camera'], // 可以指定来源是相册还是相机，默认二者都有
-      success: function (res) {
-        // 返回选定照片的本地文件路径列表，tempFilePath可以作为img标签的src属性显示图片
-        that.setData({
-          files: that.data.files.concat(res.tempFilePaths)
-        });
-      }
+  afterPicRead(e) {
+    let picsList = this.data.picsList
+    if (!picsList) {
+      picsList = []
+    }
+    picsList = picsList.concat(e.detail.file)
+    this.setData({
+      picsList
+    })
+  },
+  afterPicDel(e) {
+    let picsList = this.data.picsList
+    picsList.splice(e.detail.index, 1)
+    this.setData({
+      picsList
     })
   },
   previewImage: function (e) {
@@ -109,68 +167,122 @@ Page({
       urls: that.data.files // 需要预览的图片http链接列表
     })
   },
-  async uploadPics(){
-    const _this = this;
-    for (let i = 0; i< _this.data.files.length; i++) {
-      const res = await WXAPI.uploadFile(wx.getStorageSync('token'), _this.data.files[i])
-      if (res.code == 0) {
-        _this.data.pics.push(res.data.url)
-      }
-    }
-  },
-  async bindSave (e) {
-    // 提交保存
-    const _this = this;
-    // _this.data.orderId
-    // _this.data.type
-    // _this.data.logisticsStatus
-    // _this.data.reasons[_this.data.reasonIndex]
-    let amount = e.detail.value.amount;
-    if (_this.data.type == 2) {
+  async bindSave () {
+    let amount = this.data.curGoods.amountSingle * this.data.number
+    if (this.data.type == 2) {
+      // 换货金额为0
       amount = 0.00
     }
-    let remark = e.detail.value.remark;
-    if (!remark) {
-      remark = ''
+    wx.showLoading({
+      title: '',
+    })
+    // 批量上传附件
+    if (this.data.picsList) {
+      for (let index = 0; index < this.data.picsList.length; index++) {
+        const pic = this.data.picsList[index];
+        const res = await WXAPI.uploadFileV2(wx.getStorageSync('token'), pic.url)
+        if (res.code == 0) {
+          this.data.pics.push(res.data.url)
+        }
+      }
     }
-    // 上传图片
-    await _this.uploadPics()
-    // _this.data.pics
-    WXAPI.refundApply({
+    const res = await WXAPI.refundApply({
       token: wx.getStorageSync('token'),
-      orderId: _this.data.orderId,
-      type: _this.data.type,
-      logisticsStatus: _this.data.logisticsStatus,
-      reason: _this.data.reasons[_this.data.reasonIndex],
+      orderId: this.data.orderId,
+      orderGoodsId: this.data.curGoods.id,
+      type: this.data.type,
+      logisticsStatus: this.data.logisticsStatus,
+      reason: this.data.reason,
+      number: this.data.number,
       amount,
-      remark,
-      pic: _this.data.pics.join()
-    }).then(res => {
-      if (res.code == 0) {
-        wx.showModal({
-          title: '成功',
-          content: '提交成功，请耐心等待我们处理！',
-          showCancel: false,
-          confirmText: '我知道了',
-          success(res) {
-            wx.navigateTo({
-              url: "/pages/order-list/index"
-            })
-          }
-        })
-      } else {
-        wx.showModal({
-          title: '失败',
-          content: res.msg,
-          showCancel: false,
-          confirmText: '我知道了',
-          success(res) {
-            wx.navigateTo({
-              url: "/pages/order-list/index"
-            })
-          }
-        })
+      remark: this.data.remark || '',
+      pic: this.data.pics.join()
+    })
+    wx.hideLoading()
+    if (res.code == 20000) {
+      wx.showModal({
+        content: '当前商品正在售后中，如需重新申请，请先撤销之前的售后申请',
+        showCancel: false
+      })
+      return
+    }
+    if (res.code == 0) {
+      wx.showModal({
+        content: '提交成功，请耐心等待我们处理！',
+        showCancel: false,
+        success: res => {
+          wx.navigateBack()
+        }
+      })
+    } else {
+      wx.showModal({
+        content: res.msg,
+        showCancel: false,
+        success: res => {
+          wx.navigateBack()
+        }
+      })
+    }
+  },
+  goodsClick(e) {
+    const goodsIndex = e.currentTarget.dataset.name
+    const curGoods = this.data.goods[goodsIndex]
+    if (!curGoods || !curGoods.afterSale) {
+      return
+    }
+    this.setData({
+      goodsIndex,
+      curGoods,
+      number: curGoods.number
+    })
+  },
+  numberChange(e) {
+    let number = e.detail
+    if (!number) {
+      return
+    }
+    if (number > this.data.curGoods.number) {
+      number = this.data.curGoods.number
+    }
+    this.setData({
+      number
+    })
+  },
+  refundDetail(e) {
+    const index = e.currentTarget.dataset.idx
+    const curRufund = this.data.refundApplyList[index]
+    const imageList = []
+    if (curRufund.pics) {
+      curRufund.pics.forEach(ele => {
+        imageList.push(ele.pic + '_m')
+      })
+    }
+    this.setData({
+      popShow: true,
+      curRufund,
+      imageList
+    })
+  },
+  popClose() {
+    this.setData({
+      popShow: false
+    })
+  },
+  previewImageimageList(e) {
+    console.log(e);
+    wx.previewImage({
+      current: e.currentTarget.dataset.current,
+      urls: this.data.imageList,
+    })
+  },
+  customerService() {
+    wx.openCustomerServiceChat({
+      extInfo: {url: wx.getStorageSync('customerServiceChatUrl')},
+      corpId: wx.getStorageSync('customerServiceChatCorpId'),
+      success: res => {},
+      fail: err => {
+        console.error(err)
       }
     })
-  }
+  },
 });

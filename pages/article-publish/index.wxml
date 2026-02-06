@@ -1,0 +1,61 @@
+<view class="publish-page">
+  <!-- 状态栏占位 -->
+  <view class="status-bar" style="height: {{navTop}}px;"></view>
+  
+  <!-- 自定义导航栏 -->
+  <view class="custom-navbar">
+    <view class="navbar-content">
+      <view class="navbar-left">
+        <view class="back-btn" bindtap="goBack">
+          <van-icon name="arrow-left" size="20" color="#fff" />
+        </view>
+      </view>
+      <view class="navbar-title">发布文章</view>
+      <view class="navbar-right"></view>
+    </view>
+  </view>
+
+  <!-- 发布表单 -->
+  <view class="form-container">
+    <view class="form-item">
+      <view class="form-label">文章标题</view>
+      <input 
+        class="form-input" 
+        placeholder="请输入文章标题" 
+        value="{{title}}"
+        bindinput="onTitleInput"
+        maxlength="100"
+      />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">文章内容</view>
+      <textarea 
+        class="form-textarea" 
+        placeholder="请输入文章内容，分享您的经验和心得..." 
+        value="{{content}}"
+        bindinput="onContentInput"
+        maxlength="5000"
+        auto-height
+      />
+    </view>
+
+    <view class="form-tips">
+      <text>• 请文明发言，不发布违规内容</text>
+      <text>• 内容将经过审核后发布</text>
+    </view>
+
+    <view class="form-submit">
+      <van-button 
+        type="info" 
+        block 
+        round
+        loading="{{submitting}}"
+        disabled="{{submitting}}"
+        bind:click="submitArticle"
+      >
+        {{submitting ? '发布中...' : '发布文章'}}
+      </van-button>
+    </view>
+  </view>
+</view>

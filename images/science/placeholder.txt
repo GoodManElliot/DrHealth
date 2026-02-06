@@ -1,0 +1,12 @@
+# 科普园地图片资源目录
+
+这个目录用于存放科普园地相关的图片资源：
+
+- banner-illustration.png: 主横幅插画图片
+- article1.jpg: 文章1配图
+- article2.jpg: 文章2配图  
+- article3.jpg: 文章3配图
+- share.jpg: 分享图片
+
+请将相应的图片文件放入此目录中。
+

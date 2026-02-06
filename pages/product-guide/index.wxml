@@ -1,0 +1,90 @@
+<!--风零产品页面-->
+<view class="product-guide-container">
+  <!-- 自定义导航栏 -->
+  <view class="custom-navbar" style="height: {{navHeight}}px; padding-top: {{navTop}}px;">
+    <view class="navbar-content">
+      <view class="navbar-left">
+        <view class="back-btn" bindtap="goBack">
+          <van-icon name="arrow-left" size="20" color="#333" />
+        </view>
+        <view class="home-btn" bindtap="goHome">
+          <van-icon name="home-o" size="20" color="#333" />
+        </view>
+      </view>
+      <view class="navbar-title">风零产品</view>
+      <view class="navbar-right">
+        <van-icon name="ellipsis" size="20" color="#333" />
+      </view>
+    </view>
+  </view>
+
+  <!-- 页面内容 -->
+  <view class="page-content">
+    <!-- 页面标题 -->
+    <view class="page-header">
+      <text class="page-title">风零产品指导</text>
+      <text class="page-subtitle">科学选择，正确使用，有效管理高尿酸</text>
+    </view>
+
+    <!-- 产品指导列表 -->
+    <view class="guidance-list">
+      <view class="guidance-item" 
+            wx:for="{{productList}}" 
+            wx:key="id"
+            data-product="{{item}}"
+            bindtap="onProductTap">
+        <view class="guidance-card" style="border-left-color: {{item.color}};">
+          <view class="guidance-header">
+            <view class="guidance-icon" style="background: {{item.color}};">
+              <text class="icon-text">{{item.icon}}</text>
+            </view>
+            <view class="guidance-info">
+              <text class="guidance-title">{{item.title}}</text>
+              <text class="guidance-desc">点击查看详细指导</text>
+            </view>
+            <view class="guidance-arrow">
+              <van-icon name="arrow" size="16" color="#999" />
+            </view>
+          </view>
+          
+          <view class="guidance-items">
+            <view class="item-tag" 
+                  wx:for="{{item.items}}" 
+                  wx:key="*this"
+                  wx:for-item="subItem">
+              {{subItem}}
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 产品优势 -->
+    <view class="advantages-section">
+      <view class="advantages-header">
+        <van-icon name="star-o" size="20" color="#FFD700" />
+        <text class="advantages-title">产品优势</text>
+      </view>
+      <view class="advantages-content">
+        <view class="advantage-item">
+          <text class="advantage-icon">🔬</text>
+          <text class="advantage-text">科学配方，专业研发</text>
+        </view>
+        <view class="advantage-item">
+          <text class="advantage-icon">✅</text>
+          <text class="advantage-text">安全有效，品质保证</text>
+        </view>
+        <view class="advantage-item">
+          <text class="advantage-icon">👥</text>
+          <text class="advantage-text">用户信赖，口碑良好</text>
+        </view>
+        <view class="advantage-item">
+          <text class="advantage-icon">🛡️</text>
+          <text class="advantage-text">专业指导，贴心服务</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+
+

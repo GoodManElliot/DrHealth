@@ -1,15 +1,16 @@
 {
   "name": "wechat-app-mall",
-  "version": "8.3.0",
-  "description": "微信小程序商城，微信小程序微店",
+  "version": "8.4.0",
+  "description": "删除 <float-menu />",
   "main": "app.js",
   "dependencies": {
-    "@vant/weapp": "^1.5.0",
-    "apifm-wxapi": "^3.16.1",
+    "@vant/weapp": "^1.11.6",
+    "apifm-wxapi": "^24.06.19",
+    "dayjs": "^1.11.6",
+    "mp-html": "^2.3.1",
     "wxa-plugin-canvas": "^1.1.12",
     "wxbarcode": "^1.0.2"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

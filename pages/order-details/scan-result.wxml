@@ -26,7 +26,7 @@
           </block>
         </view>
         <view class="arrow-right">
-          <image class="arrow" src="/images/arrow-right.png"></image>
+          <van-icon name="arrow" />
         </view>
       </view>
       <view wx:else class="wuliu-box">
@@ -53,39 +53,42 @@
   </view>
   <view class="goods-list">
     <view class="list-title">商品信息</view>
-    <form bindsubmit="submitReputation" report-submit="true">
-      <block wx:for="{{orderDetail.goods}}" wx:key="{{index}}">
-        <navigator url="/pages/goods-details/index?id={{item.goodsId}}">
-          <view class="a-goods">
-            <view class="img-box">
-              <image src="{{item.pic}}" class="img" />
+    <wxs module="goodsDetailPage">
+    module.exports = {
+      url : function(item) {
+        if (item.supplyType == 'cps_jd') {
+          return '/packageCps/pages/goods-details/cps-jd?id=' + item.goodsId
+        } else if (item.supplyType == 'vop_jd') {
+          return '/pages/goods-details/vop?id=' + item.yyId + '&goodsId=' + item.id
+        } else if (item.supplyType == 'cps_pdd') {
+          return '/packageCps/pages/goods-details/cps-pdd?id=' + item.goodsId
+        } else if (item.supplyType == 'cps_taobao') {
+          return '/packageCps/pages/goods-details/cps-taobao?id=' + item.goodsId
+        } else {
+          return '/pages/goods-details/index?id=' + item.goodsId
+        }
+      }
+    }
+    </wxs>
+    <block wx:for="{{orderDetail.goods}}" wx:key="{{index}}">
+      <navigator url="{{ goodsDetailPage.url(item) }}">
+        <view class="a-goods">
+          <view class="img-box">
+            <image src="{{item.pic}}" class="img" />
+          </view>
+          <view class="text-box">
+            <view class="arow arow01">
+              <view class="goods-name">{{item.goodsName}}</view>
+              <view class="goods-price">¥ {{item.amount}}</view>
             </view>
-            <view class="text-box">
-              <view class="arow arow01">
-                <view class="goods-name">{{item.goodsName}}</view>
-                <view class="goods-price">¥ {{item.amount}}</view>
-              </view>
-              <view class="arow">
-                <view class="goods-label">{{item.property}}</view>
-                <view class="goods-num">x {{item.number}}</view>
-              </view>
+            <view class="arow">
+              <view class="goods-label">{{item.property}}</view>
+              <view class="goods-num">x {{item.number}}</view>
             </view>
           </view>
-        </navigator>
-      </block>
-    </form>
-  </view>
-  <view class="peisong-way" hidden="true">
-    <view class="row-box">
-      <view class="row-label">配送方式</view>
-      <view class="right-text">顺丰快递</view>
-    </view>
-    <view class="row-box">
-      <view class="row-label">留言</view>
-      <view class="right-text">
-        <input name="remark" type="text" class="liuyan" placeholder="如需留言请输入" />
-      </view>
-    </view>
+        </view>
+      </navigator>
+    </block>
   </view>
   <view wx:if="{{orderDetail.goodsCoupons}}" class="goods-info" style="margin-bottom:32rpx;">
     <view wx:for="{{orderDetail.goodsCoupons}}" wx:key="{{item.id}}" class="row-box">
@@ -94,20 +97,39 @@
       <image mode="widthFix" wx:if="{{item.type == 1}}" src="{{item.coupon}}" style="max-width:100%;"></image>
     </view>
   </view>
-  <view class="goods-info">
-    <view class="row-box">
-      <view class="row-label">商品金额</view>
-      <view class="right-text">¥ {{orderDetail.orderInfo.amount}}</view>
-    </view>
-    <view class="row-box">
-      <view class="row-label">运费</view>
-      <view class="right-text">+ ¥ {{orderDetail.orderInfo.amountLogistics}}</view>
-    </view>
-    <view class="row-box">
-      <view class="row-label">应付总额</view>
-      <view class="right-text">¥ {{orderDetail.orderInfo.amountReal}}</view>
-    </view>
+  <view style="width: 100vw;">
+    <van-cell-group title="订单金额">
+      <van-cell
+        title="商品金额"
+        value="¥ {{orderDetail.orderInfo.amount}}"
+      />
+      <van-cell
+        title="运费"
+        value="¥ {{orderDetail.orderInfo.amountLogistics}}"
+      />
+      <block wx:if="{{ orderDetail.orderAdditionalPrices }}">
+        <van-cell
+          wx:for="{{ orderDetail.orderAdditionalPrices }}" wx:key="id"
+          title="{{ item.name }}"
+          value="{{ '￥' + item.amount }}"
+        />
+      </block>
+      <van-cell
+        title="应付总额"
+        value="¥ {{orderDetail.orderInfo.amountReal}}"
+      />
+    </van-cell-group>
   </view>
 </view>
 
-<view wx:if="{{orderDetail.orderInfo.status ==1 || orderDetail.orderInfo.status ==2}}" class="hx-btn" bindtap="doneHx">确认核销</view>
+<view wx:if="{{ apiOK }}">
+  <view wx:if="{{ !canHX }}" class="btn">
+    <van-button type="danger" block disabled>暂无核销权限</van-button>
+  </view>
+  <view wx:elif="{{ orderDetail.orderInfo.status < 1 || orderDetail.orderInfo.status > 2 }}" class="btn">
+    <van-button type="default" block disabled>{{ orderDetail.orderInfo.statusStr }}</van-button>
+  </view>
+  <view wx:elif="{{ orderDetail.orderInfo }}" class="btn">
+    <van-button type="danger" block bind:click="doneHx">确认核销</van-button>
+  </view>
+</view>

@@ -8,7 +8,7 @@ Page({
    * 页面的初始数据
    */
   data: {
-    tabs: ["可领券", "已领券", "已失效"],
+    tabs: ['可领', '已领', '失效', '口令'],
     activeIndex: 0,
 
     showPwdPop: false
@@ -46,36 +46,12 @@ Page({
       }
     })
   },
-  /**
-   * 生命周期函数--监听页面隐藏
-   */
-  onHide: function () {
-
-  },
-
-  /**
-   * 生命周期函数--监听页面卸载
-   */
-  onUnload: function () {
-
-  },
-
-  /**
-   * 页面相关事件处理函数--监听用户下拉动作
-   */
-  onPullDownRefresh: function () {
-
-  },
-
-  /**
-   * 页面上拉触底事件的处理函数
-   */
   onReachBottom: function () {
-
+    
   },
   tabClick: function (e) {
     this.setData({
-      activeIndex: e.currentTarget.dataset.id
+      activeIndex: e.detail.index
     });
     if (this.data.activeIndex == 0) {
       this.sysCoupons()
@@ -87,9 +63,15 @@ Page({
       this.invalidCoupons()
     }
   },
-  sysCoupons: function () { // 读取可领取券列表
+  sysCoupons() { // 读取可领取券列表
     var _this = this;
+    wx.showLoading({
+      title: '',
+    })
     WXAPI.coupons().then(function (res) {
+      wx.hideLoading({
+        success: (res) => {},
+      })
       if (res.code == 0) {
         _this.setData({
           coupons: res.data
@@ -140,6 +122,12 @@ Page({
       token: wx.getStorageSync('token'),
       pwd: this.data.couponPwd
     }).then(function (res) {
+      if (res.code == 2000) {
+        wx.navigateTo({
+            url: '/pages/login/index',
+        })
+        return
+      }
       if (res.code == 20001 || res.code == 20002) {
         wx.showModal({
           title: '错误',
@@ -188,10 +176,22 @@ Page({
   },
   getMyCoupons: function () {
     var _this = this;
+    wx.showLoading({
+      title: '',
+    })
     WXAPI.myCoupons({
       token: wx.getStorageSync('token'),
       status: 0
     }).then(function (res) {
+      wx.hideLoading({
+        success: (res) => {},
+      })
+      if (res.code == 2000) {
+        wx.navigateTo({
+            url: '/pages/login/index',
+        })
+        return
+      }
       if (res.code == 0) {
         res.data.forEach(ele => {
           if (ele.dateEnd) {
@@ -210,10 +210,16 @@ Page({
   },
   invalidCoupons: function () {
     var _this = this;
+    wx.showLoading({
+      title: '',
+    })
     WXAPI.myCoupons({
       token: wx.getStorageSync('token'),
       status: '1,2,3'
     }).then(function (res) {
+      wx.hideLoading({
+        success: (res) => {},
+      })
       if (res.code == 0) {
         _this.setData({
           coupons: res.data
@@ -225,14 +231,107 @@ Page({
       }
     })
   },
-  toIndexPage: function () {
-    wx.switchTab({
-      url: "/pages/index/index"
-    });
+  async touse(e) {
+    const item = e.currentTarget.dataset.item
+    const res = await WXAPI.couponDetail(item.pid)
+    if (res.code != 0) {
+      wx.showToast({
+        title: res.msg,
+        icon: 'none'
+      })
+      return
+    }
+    if (!res.data.couponRefs || res.data.couponRefs.length == 0) {
+      wx.switchTab({
+        url: "/pages/index/index"
+      })
+      return
+    }
+    let categoryId, goodsId
+    res.data.couponRefs.forEach(ele => {
+      if (ele.type == 0) {
+        if (categoryId) {
+          categoryId = categoryId + ',' + ele.refId
+        } else {
+          categoryId = ele.refId
+        }
+      }
+      if (ele.type == 1) {
+        goodsId = ele.refId
+      }
+    })
+    if (categoryId) {
+      wx.navigateTo({
+        url: '/pages/goods/list?categoryId=' + categoryId,
+      })
+      return
+    }
+    if (goodsId) {
+      wx.navigateTo({
+        url: '/pages/goods-details/index?id=' + goodsId,
+      })
+      return
+    }
   },
   pwdCouponChange(e){
     this.setData({
       couponPwd: e.detail.value
     })
+  },
+  onPullDownRefresh() {
+    if (this.data.activeIndex == 0) {
+      this.sysCoupons()
+    }
+    if (this.data.activeIndex == 1) {
+      this.getMyCoupons()
+    }
+    if (this.data.activeIndex == 2) {
+      this.invalidCoupons()
+    }
+    wx.stopPullDownRefresh()
+  },
+  closePwd() {
+    this.setData({
+      showPwdPop: false
+    })
+  },
+  async exchangeCoupons() {
+    if (!this.data.number) {
+      wx.showToast({
+        title: '请输入券号',
+        icon: 'none'
+      })
+      return
+    }
+    if (!this.data.pwd) {
+      wx.showToast({
+        title: '请输入密码',
+        icon: 'none'
+      })
+      return
+    }
+    this.setData({
+      exchangeCouponsLoading: true
+    })
+    wx.showLoading({
+      title: '',
+    })
+    const res = await WXAPI.exchangeCoupons(wx.getStorageSync('token'), this.data.number, this.data.pwd)
+    wx.hideLoading({
+      success: (res) => {},
+    })
+    this.setData({
+      exchangeCouponsLoading: false
+    })
+    if (res.code != 0) {
+      wx.showToast({
+        title: res.msg,
+        icon: 'none'
+      })
+    } else {
+      wx.showToast({
+        title: '兑换成功'
+      })
+    }
   },
 })

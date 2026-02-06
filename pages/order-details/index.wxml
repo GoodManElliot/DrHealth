@@ -26,7 +26,7 @@
           </block>
         </view>
         <view class="arrow-right">
-          <image class="arrow" src="/images/arrow-right.png"></image>
+          <van-icon name="arrow" />
         </view>
       </view>
       <view wx:else class="wuliu-box">
@@ -38,6 +38,17 @@
           <view class="wuliu-text">暂无物流信息</view>
         </view>
       </view>
+      <van-cell-group wx:if="{{ orderDetail.orderLogisticsShippers && orderDetail.orderLogisticsShippers.length > 0 }}">
+        <van-cell
+          wx:for="{{ orderDetail.orderLogisticsShippers }}"
+          wx:key="id"
+          title="{{ item.shipperName }}: {{ item.trackingNumber }}"
+          label="{{ item.tracesLast }}"
+          center
+          is-link
+          url="/pages/wuliu/index?id={{ item.orderId }}&trackingNumber={{ item.trackingNumber }}"
+        />
+      </van-cell-group>
       <view class="address-sec">
         <view class="icon-box">
           <image class="icon" src="/images/order-details/icon-address.png"></image>
@@ -51,52 +62,68 @@
       </view>
     </block>
   </view>
-  <view wx:if="{{orderDetail.orderInfo.hxNumber && orderDetail.orderInfo.status > 0}}" class="goods-list">
-    <view class="list-title hx-title">核销码</view>
-    <canvas class="hx-canvas" canvas-id="qrcode" />
+  <view wx:if="{{ hxNumberQrcode }}" class="goods-list">
+    <view class="list-title hx-title">核销码「出示给店员或者长按下载」</view>
+    <image class="hx-canvas" src="{{ hxNumberQrcode }}" mode="widthFix" show-menu-by-longpress></image>
   </view>
   <view class="goods-list">
     <view class="list-title">商品信息</view>
-    <form bindsubmit="submitReputation" report-submit="true">
-      <block wx:for="{{orderDetail.goods}}" wx:key="{{index}}">
-        <navigator url="/pages/goods-details/index?id={{item.goodsId}}">
-          <view class="a-goods">
-            <view class="img-box">
-              <image src="{{item.pic}}" class="img" />
-            </view>
-            <view class="text-box">
-              <view class="arow arow01">
-                <view class="goods-name">{{item.goodsName}}</view>
-                <view class="goods-price">¥ {{item.amount}}</view>
-              </view>
-              <view class="arow">
-                <view class="goods-label">{{item.property}}</view>
-                <view class="goods-num">x {{item.number}}</view>
-              </view>
-            </view>
+    <wxs module="goodsDetailPage">
+    module.exports = {
+      url : function(item) {
+        if (item.supplyType == 'cps_jd') {
+          return '/packageCps/pages/goods-details/cps-jd?id=' + item.goodsId
+        } else if (item.supplyType == 'vop_jd') {
+          return '/pages/goods-details/vop?id=' + item.yyId + '&goodsId=' + item.id
+        } else if (item.supplyType == 'cps_pdd') {
+          return '/packageCps/pages/goods-details/cps-pdd?id=' + item.goodsId
+        } else if (item.supplyType == 'cps_taobao') {
+          return '/packageCps/pages/goods-details/cps-taobao?id=' + item.goodsId
+        } else {
+          return '/pages/goods-details/index?id=' + item.goodsId
+        }
+      }
+    }
+    </wxs>
+    <form bindsubmit="submitReputation">
+      <block wx:for="{{orderDetail.goods}}" wx:key="id">
+        <van-card
+          num="{{item.number}}"
+          price="{{item.amount}}"
+          desc="{{item.property}}"
+          title="{{item.goodsName}}"
+          thumb="{{item.pic}}"
+          thumb-link="{{ goodsDetailPage.url(item) }}"
+          centered
+          lazy-load
+        />
+        <van-cell-group wx:if="{{orderDetail.orderInfo.status==3}}" title="评价">
+          <input name="orderGoodsId{{index}}" value="{{item.id}}" style="display:none;" />
+          <van-cell title="满意度">
+            <van-rate name="goodReputation{{index}}" value="{{ 5 }}" />
+          </van-cell>
+          <van-field
+            name="goodReputationRemark{{index}}"
+            value="{{ message }}"
+            type="textarea"
+            placeholder="从多个角度评价宝贝，可以帮助更多想买对人"
+            autosize
+          />
+          <view style="margin-top:16rpx;padding-left:16rpx;">
+            <van-uploader
+              accept="image"
+              multiple
+              upload-text="买家秀"
+              image-fit="aspectFill"
+              file-list="{{ picsList[index] }}"
+              data-idx="{{ index }}"
+              bind:after-read="afterPicRead"
+              bind:delete="afterPicDel"
+            />
           </view>
-        </navigator>
-        <view class="btn-row" wx:if="{{orderDetail.orderInfo.status==3}}">
-          <view class="section section_gap">
-            <view style="margin-top:35rpx;margin-bottom:35rpx;">评价：</view>
-            <radio-group name="goodReputation{{index}}">
-              <label style="margin-right:35rpx;">
-                <radio value="2" checked/>好评</label>
-              <label style="margin-right:35rpx;">
-                <radio value="1" />中评</label>
-              <label style="margin-right:35rpx;">
-                <radio value="0" />差评</label>
-            </radio-group>
-          </view>
-          <view class="row-box" style="margin-top:35rpx">
-            <view class="row-label">备注</view>
-            <input name="orderGoodsId{{index}}" value="{{item.id}}" style="display:none;" />
-            <textarea name="goodReputationRemark{{index}}" style="margin-top:35rpx;width:100%;" value="非常愉快的一次购物！" />
-          </view>
-        </view>
+        </van-cell-group>
       </block>
       <view class="btn-row" wx:if="{{orderDetail.orderInfo.status==3}}">
-        <navigator style="float:right;" class="confirm-btn" target="miniProgram" app-id="wx56c8f077de74b07c" path="/open/order-comment/order-comment?appid={{appid}}&order_id={{orderDetail.orderInfo.orderNumber}}">去购物单评价</navigator>
         <button style="float:right;" class="confirm-btn" formType="submit">提交评价</button>
       </view>
     </form>
@@ -106,6 +133,12 @@
       </view>
     </form>
   </view>
+  <view wx:if="{{ orderStores && orderStores.length > 0 }}" class="vw100">
+    <van-cell-group title="日期详情">
+      <van-cell wx:for="{{ orderStores }}" wx:key="id" title="{{ item.remark }} X{{ item.stores }}" value="{{ item.day }}" />
+    </van-cell-group>
+  </view>
+  <view wx:if="{{ orderStores && orderStores.length > 0 }}" class="space"></view>
   <view class="peisong-way" hidden="true">
     <view class="row-box">
       <view class="row-label">配送方式</view>
@@ -125,18 +158,39 @@
       <image mode="widthFix" wx:if="{{item.type == 1}}" src="{{item.coupon}}" style="max-width:100%;"></image>
     </view>
   </view>
-  <view class="goods-info">
-    <view class="row-box">
-      <view class="row-label">商品金额</view>
-      <view class="right-text">¥ {{orderDetail.orderInfo.amount}}</view>
-    </view>
-    <view class="row-box">
-      <view class="row-label">运费</view>
-      <view class="right-text">+ ¥ {{orderDetail.orderInfo.amountLogistics}}</view>
-    </view>
-    <view class="row-box">
-      <view class="row-label">应付总额</view>
-      <view class="right-text">¥ {{orderDetail.orderInfo.amountReal}}</view>
-    </view>
+  <view style="width: 100vw;">
+    <van-cell-group title="订单金额">
+      <van-cell
+        title="商品金额"
+        value="¥ {{orderDetail.orderInfo.amount}}"
+      />
+      <van-cell
+        title="运费"
+        value="¥ {{orderDetail.orderInfo.amountLogistics}}"
+      />
+      <block wx:if="{{ orderDetail.orderAdditionalPrices }}">
+        <van-cell
+          wx:for="{{ orderDetail.orderAdditionalPrices }}" wx:key="id"
+          title="{{ item.name }}"
+          value="{{ '￥' + item.amount }}"
+        />
+      </block>
+      <van-cell
+        title="应付总额"
+        value="¥ {{orderDetail.orderInfo.amountReal}}"
+      />
+    </van-cell-group>
   </view>
 </view>
+
+<van-cell-group wx:if="{{ shopIotDevices && shopIotDevices.length > 0 }}" title="设备控制">
+  <van-cell wx:for="{{ shopIotDevices }}" wx:key="id" title="{{ item.name }}" value="控制" is-link data-idx="{{ index }}" bind:click="shopIotCmds" />
+</van-cell-group>
+<van-action-sheet
+  show="{{ cmdListShow }}"
+  actions="{{ cmdList }}"
+  cancel-text="取消"
+  bind:close="cmdClose"
+  bind:cancel="cmdClose"
+  bind:select="cmdSelect"
+/>
