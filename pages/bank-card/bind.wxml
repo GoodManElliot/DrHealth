@@ -1,0 +1,86 @@
+<view class="bind-container">
+  <view class="form-card">
+    <view class="form-title">银行卡信息</view>
+
+    <view class="item-label">开户行</view>
+    <view class="hint">先选择银行名称，再填写支行名称（转账必填）；若列表没有则手动填写</view>
+
+    <picker mode="selector" range="{{ provinces }}" range-key="name" value="{{ provinceIndex }}" bindchange="onProvinceChange">
+      <view class="form-item picker-item">
+        <view class="item-label">所属省份 <text class="required">*</text></view>
+        <view class="item-value">
+          <text class="{{ provinces[provinceIndex] ? '' : 'placeholder' }}">{{ provinces[provinceIndex] ? provinces[provinceIndex].name : '请选择省份' }}</text>
+          <text class="arrow">›</text>
+        </view>
+      </view>
+    </picker>
+
+    <picker mode="selector" range="{{ cities }}" range-key="name" value="{{ cityIndex }}" bindchange="onCityChange">
+      <view class="form-item picker-item">
+        <view class="item-label">所属城市 <text class="required">*</text></view>
+        <view class="item-value">
+          <text class="{{ cities[cityIndex] ? '' : 'placeholder' }}">{{ cities[cityIndex] ? cities[cityIndex].name : '请先选择省份' }}</text>
+          <text class="arrow">›</text>
+        </view>
+      </view>
+    </picker>
+
+    <picker mode="selector" range="{{ banks }}" range-key="name" value="{{ bankIndex }}" bindchange="onBankPickerChange">
+      <view class="form-item picker-item">
+        <view class="item-label">银行名称</view>
+        <view class="item-value">
+          <text class="{{ (banks[bankIndex] && (banks[bankIndex].name || banks[bankIndex].bankName)) ? '' : 'placeholder' }}">{{ banks[bankIndex] ? (banks[bankIndex].name || banks[bankIndex].bankName || '请选择银行') : '请选择银行' }}</text>
+          <text class="arrow">›</text>
+        </view>
+      </view>
+    </picker>
+
+    <view class="form-item" wx:if="{{ banks[bankIndex] && banks[bankIndex].id === 'other' }}">
+      <view class="item-label">请输入银行名称</view>
+      <van-field
+        model:value="{{ bankNameManual }}"
+        placeholder="如：中国工商银行"
+        clearable
+        border="{{ false }}"
+        custom-style="padding: 0; font-size: 30rpx;"
+      />
+    </view>
+
+    <view class="form-item">
+      <view class="item-label">支行名称 <text class="required">*</text></view>
+      <van-field
+        model:value="{{ branchName }}"
+        placeholder="如：XX支行、XX分理处（转账必填）"
+        clearable
+        border="{{ false }}"
+        custom-style="padding: 0; font-size: 30rpx;"
+      />
+    </view>
+
+    <view class="form-item">
+      <view class="item-label">银行卡号 <text class="required">*</text></view>
+      <van-field
+        type="idcard"
+        model:value="{{ bankNo }}"
+        placeholder="请输入银行卡号"
+        clearable
+        border="{{ false }}"
+        custom-style="padding: 0; font-size: 30rpx;"
+      />
+    </view>
+    <view class="form-item">
+      <view class="item-label">真实姓名 <text class="required">*</text></view>
+      <van-field
+        model:value="{{ realName }}"
+        placeholder="与银行卡开户名一致，2～20个字符"
+        clearable
+        border="{{ false }}"
+        custom-style="padding: 0; font-size: 30rpx;"
+      />
+    </view>
+    </view>
+  <view class="tips">请确保姓名与银行卡开户名一致，否则可能无法到账</view>
+  <view class="btn-wrap">
+    <van-button type="danger" block round custom-class="submit-btn" bind:click="bindSave">确认绑定</van-button>
+  </view>
+</view>

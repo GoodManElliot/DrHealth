@@ -218,17 +218,20 @@ Page({
         return
       }
     }
+    // 订单相关订阅（下单成功/已发货/物流等）统一在 subscribe_ids 中，逗号分隔
     const subscribe_ids = wx.getStorageSync('subscribe_ids')
-    if (subscribe_ids) {
+    const tmplIds = subscribe_ids ? subscribe_ids.split(',').map(s => s.trim()).filter(Boolean) : []
+    if (tmplIds.length > 0) {
       wx.requestSubscribeMessage({
-        tmplIds: subscribe_ids.split(','),
+        tmplIds,
         success(res) {
-          console.log(res)
+          // res: { [模板ID]: 'accept' | 'reject' }，全部为 accept 才会收到对应订阅消息
+          console.log('订阅结果', res)
         },
         fail(e) {
           console.error(e)
         },
-        complete: (e) => {
+        complete: () => {
           this.createOrder(true)
         },
       })

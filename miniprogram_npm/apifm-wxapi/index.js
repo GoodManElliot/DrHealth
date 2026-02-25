@@ -1016,6 +1016,9 @@ module.exports = {
   withDrawApplyV2: function withDrawApplyV2(data) {
     return request('/user/withDraw/apply', true, 'post', data);
   },
+  withDrawApplyV3: function withDrawApplyV3(data) {
+    return request('/user/withDraw/applyV3', true, 'post', data);
+  },
   withDrawDetail: function withDrawDetail(token, id) {
     return request('/user/withDraw/detail', true, 'get', {
       token: token,

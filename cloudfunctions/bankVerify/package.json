@@ -1,0 +1,9 @@
+{
+  "name": "bankVerify",
+  "version": "1.0.0",
+  "description": "调用阿里云银行卡三要素核验",
+  "main": "index.js",
+  "dependencies": {
+    "@alicloud/pop-core": "^1.7.14"
+  }
+}

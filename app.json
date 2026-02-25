@@ -27,6 +27,7 @@
     "pages/wuliu/index",
     "pages/my/index",
     "pages/withdraw/index",
+    "pages/bank-card/bind",
     "pages/score-excharge/index",
     "pages/score-excharge/growth",
     "pages/asset/index",

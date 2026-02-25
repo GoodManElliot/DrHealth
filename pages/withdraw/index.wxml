@@ -7,7 +7,38 @@
         <text class="balance-symbol">¥</text>
         <text class="balance-value">{{ balance }}</text>
       </view>
-      <view class="balance-tips">提现将在1-3个工作日内到账</view>
+      <view class="balance-tips">提现将在1-3个工作日完成审核</view>
+    </view>
+  </view>
+
+  <!-- 提现方式选择 -->
+  <view class="withdraw-form">
+    <view class="form-title">提现方式</view>
+    <view class="type-options">
+      <view class="type-item {{ withdrawType === 'wechat' ? 'active' : '' }}" data-type="wechat" bindtap="onTypeChange">
+        <view class="type-name">微信零钱打款</view>
+        <view class="type-desc">提现至微信零钱，到账后在零钱中查看</view>
+      </view>
+      <view class="type-item {{ withdrawType === 'bank' ? 'active' : '' }}" data-type="bank" bindtap="onTypeChange">
+        <view class="type-name">银行卡提现</view>
+        <view class="type-desc">提现至已绑定银行卡，1-3个工作日到账</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 银行卡提现：展示已绑卡或去绑定 -->
+  <view class="withdraw-form" wx:if="{{ withdrawType === 'bank' }}">
+    <view class="form-title">收款银行卡</view>
+    <view class="bank-block" wx:if="{{ bankInfo && (bankInfo.id || bankInfo.bankCardNumber || bankInfo.bankNo || bankInfo.cardNo) }}">
+      <view class="bank-info">
+        <view class="bank-name">{{ bankInfo.bankName || bankInfo.name || bankInfo.bank_name || bankInfo.openBank || '银行卡' }}</view>
+        <view class="bank-no">尾号 {{ bankInfo.bankCardTail || '****' }}</view>
+      </view>
+      <view class="bank-link" bindtap="onUnbindBank">解绑</view>
+    </view>
+    <view class="bank-block bank-empty" wx:else bindtap="goBindBank">
+      <text class="bank-empty-text">您还未绑定银行卡，点击去绑定</text>
+      <text class="bank-arrow">›</text>
     </view>
   </view>
 
@@ -30,7 +61,8 @@
       />
     </view>
 
-    <view class="form-item" wx:if="{{ amount > 2000 }}">
+    <!-- 微信零钱：超过2000需填姓名 -->
+    <view class="form-item" wx:if="{{ withdrawType === 'wechat' && amount > 2000 }}">
       <view class="item-label">
         <text class="label-icon">👤</text>
         <text>真实姓名</text>
@@ -67,7 +99,9 @@
       <text>温馨提示</text>
     </view>
     <view class="tips-content">
-      <view class="tips-item">• 申请通过后需要到“提现记录”中确认收款</view>
+      <view class="tips-item" wx:if="{{ withdrawType === 'wechat' }}">• 微信零钱打款：申请通过后<text class="tips-bold">需到「提现记录」中确认收款</text></view>
+      <view class="tips-item" wx:if="{{ withdrawType === 'wechat' }}">• 单次提现限额 200 元</view>
+      <view class="tips-item" wx:if="{{ withdrawType === 'bank' }}">• 银行卡提现：将打款至上述银行卡，请核对无误</view>
       <view class="tips-item">• 每日最多可申请3次提现</view>
       <view class="tips-item">• 如有疑问请联系客服</view>
     </view>

@@ -93,6 +93,91 @@ page {
   border-left: 6rpx solid #E93323;
 }
 
+/* 提现方式选择 */
+.type-options {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.type-item {
+  padding: 28rpx;
+  border-radius: 12rpx;
+  border: 2rpx solid #eee;
+  background: #fafafa;
+  transition: all 0.2s;
+}
+
+.type-item.active {
+  border-color: #E93323;
+  background: #fff5f5;
+}
+
+.type-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8rpx;
+}
+
+.type-desc {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.type-item.active .type-name {
+  color: #E93323;
+}
+
+/* 收款银行卡 */
+.bank-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx;
+  background: #f9f9f9;
+  border-radius: 12rpx;
+  margin-bottom: 24rpx;
+}
+
+.bank-info {
+  flex: 1;
+}
+
+.bank-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8rpx;
+}
+
+.bank-no {
+  font-size: 26rpx;
+  color: #666;
+}
+
+.bank-link {
+  font-size: 28rpx;
+  color: #E93323;
+  padding: 8rpx 16rpx;
+}
+
+.bank-empty {
+  background: #fff8f8;
+  border: 1rpx dashed #E93323;
+}
+
+.bank-empty-text {
+  font-size: 28rpx;
+  color: #E93323;
+}
+
+.bank-arrow {
+  font-size: 36rpx;
+  color: #E93323;
+  margin-left: 8rpx;
+}
+
 .form-item {
   margin-bottom: 36rpx;
   padding-bottom: 32rpx;
@@ -151,6 +236,11 @@ page {
   color: #999;
   line-height: 44rpx;
   position: relative;
+}
+
+.tips-item .tips-bold {
+  font-weight: bold;
+  color: #333;
 }
 
 /* 提交按钮 */
